@@ -1521,6 +1521,9 @@ button { cursor: pointer; font: inherit; }
   font-size: 12px;
   padding: 4px 0;
 }
+.include-tree-panel.tree-is-loading .include-tree-node-row {
+  cursor: wait;
+}
 </style>
 </head>
 <body>
@@ -1739,6 +1742,17 @@ button { cursor: pointer; font: inherit; }
     statusEl.style.color = isError ? 'var(--danger)' : '';
   }
 
+  function setTreeLoadingCount(panel, delta) {
+    if (!panel) { return; }
+    var count = Math.max(0, parseInt(panel.dataset.loadingCount || '0', 10) + delta);
+    panel.dataset.loadingCount = String(count);
+    if (count > 0) {
+      panel.classList.add('tree-is-loading');
+    } else {
+      panel.classList.remove('tree-is-loading');
+    }
+  }
+
   function getIncludeBlockById(includeId) {
     return document.querySelector('.include-block[data-id="' + includeId + '"]');
   }
@@ -1793,6 +1807,8 @@ button { cursor: pointer; font: inherit; }
     }
 
     setIncludeTreeStatus(panel, 'Loading tree...', false);
+    panel.dataset.loadingCount = '1';
+    panel.classList.add('tree-is-loading');
 
     vscode.postMessage({
       command: 'loadIncludeTree',
@@ -1830,6 +1846,7 @@ button { cursor: pointer; font: inherit; }
     if (childrenList) {
       childrenList.innerHTML = '<li class="include-tree-node"><div class="include-tree-node-row"><span class="include-tree-node-spacer"></span><span class="include-tree-node-label status-loading">Loading...</span></div></li>';
     }
+    setTreeLoadingCount(panel, 1);
 
     vscode.postMessage({
       command: 'loadIncludeTreeChildren',
@@ -1898,6 +1915,7 @@ button { cursor: pointer; font: inherit; }
     }
 
     if (panel.dataset.requestId === rootRequestId) {
+      setTreeLoadingCount(panel, -1);
       setIncludeTreeStatus(panel, 'Tree loaded and fully expanded.', false);
     }
   }
@@ -1925,6 +1943,8 @@ button { cursor: pointer; font: inherit; }
     if (payload.error) {
       root.innerHTML = '<div class="include-tree-root-empty">Unable to load tree.</div>';
       setIncludeTreeStatus(panel, payload.error, true);
+      panel.dataset.loadingCount = '0';
+      panel.classList.remove('tree-is-loading');
       return;
     }
 
@@ -1977,6 +1997,7 @@ button { cursor: pointer; font: inherit; }
     if (payload.error) {
       childrenList.innerHTML = '<li class="include-tree-node"><div class="include-tree-node-row"><span class="include-tree-node-spacer"></span><span class="include-tree-node-label status-not-serialized">Unable to load children.</span></div></li>';
       if (panel) {
+        setTreeLoadingCount(panel, -1);
         setIncludeTreeStatus(panel, payload.error, true);
       }
       return;
@@ -1993,6 +2014,7 @@ button { cursor: pointer; font: inherit; }
 
     nodeElement.dataset.loadedChildren = 'true';
     if (panel) {
+      setTreeLoadingCount(panel, -1);
       setIncludeTreeStatus(panel, 'Tree updated.', false);
     }
   }
