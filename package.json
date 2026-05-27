@@ -2,8 +2,12 @@
   "name": "sitecore-serialization-viewer",
   "displayName": "Sitecore Serialization Viewer",
   "description": "Helps Sitecore Developers visualize how SCS Serialization is configured in a project",
-  "version": "0.0.1",
-  "publisher": "rpeplau",
+  "version": "1.0.0",
+  "publisher": "RodrigoPeplau",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peplau/sitecore-serialization-viewer.git"
+  },
   "engines": {
     "vscode": "^1.110.0"
   },
