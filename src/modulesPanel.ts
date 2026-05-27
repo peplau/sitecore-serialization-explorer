@@ -38,7 +38,7 @@ export class ModulesPanel {
 
     const panel = vscode.window.createWebviewPanel(
       'sitecoreSerializationModules',
-      'Modules Listing',
+      'Sitecore Serialization Explorer: Modules',
       column || vscode.ViewColumn.One,
       {
         enableScripts: true

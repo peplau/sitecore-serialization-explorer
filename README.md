@@ -1,6 +1,10 @@
- # Sitecore Serialization Viewer
+# Sitecore Serialization Explorer
+Sitecore Serialization Explorer is a Visual Studio Code extension that helps Sitecore developers visualize, inspect, validate, and edit Sitecore Content Serialization (SCS) configuration from inside the IDE.
+- Adds a custom view in Explorer: **Sitecore Serialization Explorer**.
+Initial public version of Sitecore Serialization Explorer with:
+# Sitecore Serialization Explorer
 
-Sitecore Serialization Viewer is a Visual Studio Code extension that helps Sitecore developers visualize, inspect, validate, and edit Sitecore Content Serialization (SCS) configuration from inside the IDE.
+Sitecore Serialization Explorer is a Visual Studio Code extension that helps Sitecore developers visualize, inspect, validate, and edit Sitecore Content Serialization (SCS) configuration from inside the IDE.
 
 It provides:
 
@@ -14,7 +18,7 @@ It provides:
 
 ### 1) Explorer View: Sitecore Content Tree
 
-- Adds a custom view in Explorer: **Sitecore Serialization Viewer**.
+- Adds a custom view in Explorer: **Sitecore Serialization Explorer**.
 - Loads children from Authoring GraphQL for the selected Sitecore database.
 - Supports normal expand/collapse behavior and refresh.
 - Displays `/sitecore` as the root node.
@@ -191,7 +195,7 @@ Users appreciate release notes as you update your extension.
 
 ### 0.0.1
 
-Initial public version of Sitecore Serialization Viewer with:
+Initial public version of Sitecore Serialization Explorer with:
 
 - Explorer tree integration and serialization status indicators.
 - Path/GUID search and reveal.

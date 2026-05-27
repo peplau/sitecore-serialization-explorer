@@ -116,7 +116,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "sitecore-serialization-viewer" is now active!');
+	console.log('Congratulations, your extension "sitecore-serialization-explorer" is now active!');
 
 	// Create and register the tree data provider
 	const treeProvider = new ContentTreeProvider();
@@ -216,7 +216,7 @@ export function activate(context: vscode.ExtensionContext) {
 		return `{${stripped.toUpperCase()}}`;
 	};
 
-	const searchPathCommand = vscode.commands.registerCommand('sitecore-serialization-viewer.searchPath', async () => {
+	const searchPathCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.searchPath', async () => {
 		const value = await vscode.window.showInputBox({
 			prompt: 'Type the item path or ID',
 			placeHolder: '/sitecore/content/home or {FBFE3DAE-E317-4DCE-97D2-94C806896642}',
@@ -272,7 +272,7 @@ export function activate(context: vscode.ExtensionContext) {
 		databaseStatus.tooltip = 'Select Sitecore database for content tree (master/core)';
 	};
 	updateDatabaseStatus();
-	databaseStatus.command = 'sitecore-serialization-viewer.selectDatabase';
+	databaseStatus.command = 'sitecore-serialization-explorer.selectDatabase';
 	databaseStatus.show();
 
 	const moduleStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 9);
@@ -282,11 +282,11 @@ export function activate(context: vscode.ExtensionContext) {
 		moduleStatus.tooltip = 'Select module filter for content tree';
 	};
 	updateModuleStatus();
-	moduleStatus.command = 'sitecore-serialization-viewer.selectModule';
+	moduleStatus.command = 'sitecore-serialization-explorer.selectModule';
 	moduleStatus.show();
 
 	// Register commands
-	const refreshTreeCommand = vscode.commands.registerCommand('sitecore-serialization-viewer.refreshTree', async () => {
+	const refreshTreeCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.refreshTree', async () => {
 		await vscode.commands.executeCommand('workbench.actions.treeView.sitecoreContentTree.collapseAll');
 		resetPerfOutputFromEnv();
 		treeProvider.resetFromScratch();
@@ -296,7 +296,7 @@ export function activate(context: vscode.ExtensionContext) {
 		void treeProvider.prefetchRootIconAndExpand(treeView);
 	});
 
-	const selectDatabaseCommand = vscode.commands.registerCommand('sitecore-serialization-viewer.selectDatabase', async () => {
+	const selectDatabaseCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.selectDatabase', async () => {
 		const current = treeProvider.getSelectedDatabase();
 		const selection = await vscode.window.showQuickPick(
 			[
@@ -319,7 +319,7 @@ export function activate(context: vscode.ExtensionContext) {
 		treeProvider.refresh({ resetState: true });
 	});
 
-	const selectModuleCommand = vscode.commands.registerCommand('sitecore-serialization-viewer.selectModule', async () => {
+	const selectModuleCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.selectModule', async () => {
 		const current = treeProvider.getSelectedModule();
 		const moduleOptions = ['All modules', ...(await treeProvider.getAvailableModules())];
 		const selection = await vscode.window.showQuickPick(
@@ -346,7 +346,7 @@ export function activate(context: vscode.ExtensionContext) {
 		await expandVisibleModuleTree();
 	});
 
-	const copyPathCommand = vscode.commands.registerCommand('sitecore-serialization-viewer.copyPath', (item: SitecoreTreeItem) => {
+	const copyPathCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.copyPath', (item: SitecoreTreeItem) => {
 		if (item) {
 			vscode.env.clipboard.writeText(item.item.path);
 			vscode.window.showInformationMessage(`Copied: ${item.item.path}`);
@@ -355,7 +355,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const exec = promisify(execCallback);
 
-	const showDetailsCommand = vscode.commands.registerCommand('sitecore-serialization-viewer.showDetails', async (item: SitecoreItem) => {
+	const showDetailsCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.showDetails', async (item: SitecoreItem) => {
 		const resolveModuleJsonPathFn = async (moduleName: string): Promise<string | undefined> => {
 			const modules = await treeProvider.getModuleListingItems();
 			const module = modules.find(m => m.namespace.toLowerCase() === moduleName.toLowerCase());
@@ -379,7 +379,7 @@ export function activate(context: vscode.ExtensionContext) {
 		await panel.update(item, explainResult);
 	});
 
-	const showAllModulesCommand = vscode.commands.registerCommand('sitecore-serialization-viewer.showAllModules', async () => {
+	const showAllModulesCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.showAllModules', async () => {
 		const panel = ModulesPanel.createOrShow(async (jsonFilePath: string) => {
 			const itemsPanel = ModuleItemsPanel.createOrShowLoading(jsonFilePath);
 			const moduleItems = await treeProvider.getModuleItemsListingByJsonPath(jsonFilePath);
@@ -396,7 +396,7 @@ export function activate(context: vscode.ExtensionContext) {
 		panel.update(modules);
 	});
 
-	const openModuleInEditUiCommand = vscode.commands.registerCommand('sitecore-serialization-viewer.openModuleInEditUi', async () => {
+	const openModuleInEditUiCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.openModuleInEditUi', async () => {
 		const editor = vscode.window.activeTextEditor;
 		if (!editor) {
 			vscode.window.showWarningMessage('Open a JSON file first.');
@@ -478,7 +478,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('sitecore-serialization-viewer.helloWorld', () => {
+	const disposable = vscode.commands.registerCommand('sitecore-serialization-explorer.helloWorld', () => {
 		// The code you place here will be executed every time your command is executed
 		// Display a message box to the user
 		vscode.window.showInformationMessage('Hello World from Sitecore Serialization Viewer!');

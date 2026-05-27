@@ -48,7 +48,7 @@ export class SitecoreTreeItem extends vscode.TreeItem {
 
     // Command to show details
     this.command = {
-      command: 'sitecore-serialization-viewer.showDetails',
+      command: 'sitecore-serialization-explorer.showDetails',
       title: 'Show Details',
       arguments: [item]
     };

@@ -31,7 +31,7 @@ export class ExplainPanel {
 
 		const panel = vscode.window.createWebviewPanel(
 			'sitecoreSerializationExplain',
-			'Sitecore Explain',
+			'Sitecore Serialization Explorer: Explain',
 			column || vscode.ViewColumn.One,
 			{
 				enableScripts: true,

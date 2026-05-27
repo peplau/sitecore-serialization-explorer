@@ -1,12 +1,12 @@
 {
-  "name": "sitecore-serialization-viewer",
-  "displayName": "Sitecore Serialization Viewer",
+  "name": "sitecore-serialization-explorer",
+  "displayName": "Sitecore Serialization Explorer",
   "description": "Helps Sitecore Developers visualize how SCS Serialization is configured in a project",
   "version": "1.0.0",
   "publisher": "RodrigoPeplau",
   "repository": {
     "type": "git",
-    "url": "https://github.com/peplau/sitecore-serialization-viewer.git"
+    "url": "https://github.com/peplau/sitecore-serialization-explorer.git"
   },
   "engines": {
     "vscode": "^1.110.0"
@@ -16,40 +16,40 @@
   ],
   "activationEvents": [
     "onView:sitecoreContentTree",
-    "onCommand:sitecore-serialization-viewer.openModuleInEditUi"
+    "onCommand:sitecore-serialization-explorer.openModuleInEditUi"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "configuration": {
       "type": "object",
-      "title": "Sitecore Serialization Viewer",
+      "title": "Sitecore Serialization Explorer",
       "properties": {
-        "sitecoreSerializationViewer.authoringGraphqlUrl": {
+        "sitecoreSerializationExplorer.authoringGraphqlUrl": {
           "type": "string",
           "default": "",
           "description": "Optional full Authoring GraphQL URL (e.g., https://<hostname>/sitecore/api/authoring/graphql/v1/). Env var equivalent: SITECORE_EDGE_HOSTNAME (accepts hostname or full URL)."
         },
-        "sitecoreSerializationViewer.edgeContextId": {
+        "sitecoreSerializationExplorer.edgeContextId": {
           "type": "string",
           "default": "",
           "description": "Sitecore Edge context ID sent as the SC-Edge-Context-Id request header. Env var equivalent: SITECORE_EDGE_CONTEXT_ID."
         },
-        "sitecoreSerializationViewer.endpoint": {
+        "sitecoreSerializationExplorer.endpoint": {
           "type": "string",
           "default": "xmCloud",
           "description": "Endpoint key inside .sitecore/user.json -> endpoints from which the accessToken is read. Env var equivalent: ENDPOINT."
         },
-        "sitecoreSerializationViewer.defaultLanguage": {
+        "sitecoreSerializationExplorer.defaultLanguage": {
           "type": "string",
           "default": "en",
           "description": "Default Sitecore language for GraphQL requests. Env var equivalent: LANGUAGE."
         },
-        "sitecoreSerializationViewer.defaultDatabase": {
+        "sitecoreSerializationExplorer.defaultDatabase": {
           "type": "string",
           "default": "master",
           "description": "Default Sitecore database for tree queries. Env var equivalent: DATABASE."
         },
-        "sitecoreSerializationViewer.debug": {
+        "sitecoreSerializationExplorer.debug": {
           "type": "boolean",
           "default": false,
           "description": "Enable the performance diagnostics output channel. Env var equivalent: DEBUG."
@@ -95,7 +95,7 @@
         "icon": "$(library)"
       },
       {
-        "command": "sitecore-serialization-viewer.openModuleInEditUi",
+        "command": "sitecore-serialization-explorer.openModuleInEditUi",
         "title": "Open in Module Edition UI"
       }
     ],
@@ -105,7 +105,7 @@
           "id": "sitecoreContentTree",
           "name": "Sitecore Serialization Viewer",
           "icon": "$(folder)",
-          "contextualTitle": "Sitecore Serialization Viewer"
+          "contextualTitle": "Sitecore Serialization Explorer"
         }
       ]
     },

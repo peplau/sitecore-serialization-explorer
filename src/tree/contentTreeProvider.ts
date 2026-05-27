@@ -118,7 +118,7 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
 
   constructor() {
     this.client = new AuthoringGraphqlClient();
-    const config = vscode.workspace.getConfiguration('sitecoreSerializationViewer');
+    const config = vscode.workspace.getConfiguration('sitecoreSerializationExplorer');
     this.selectedDatabase = config.get<string>('defaultDatabase') || 'master';
     this.client.setDatabase(this.selectedDatabase);
   }
@@ -1752,7 +1752,7 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
   }
 
   resetFromScratch(): void {
-    const config = vscode.workspace.getConfiguration('sitecoreSerializationViewer');
+    const config = vscode.workspace.getConfiguration('sitecoreSerializationExplorer');
     this.selectedDatabase = config.get<string>('defaultDatabase') || 'master';
     this.selectedModule = 'All modules';
     this.refresh({ resetState: true });

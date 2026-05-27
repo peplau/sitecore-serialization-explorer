@@ -142,7 +142,7 @@ export class AuthoringGraphqlClient {
       return;
     } // Already initialized
 
-    const config = vscode.workspace.getConfiguration('sitecoreSerializationViewer');
+    const config = vscode.workspace.getConfiguration('sitecoreSerializationExplorer');
     const explicitUrl = config.get<string>('authoringGraphqlUrl');
 
     // Read from .env.local file in workspace
@@ -282,7 +282,7 @@ export class AuthoringGraphqlClient {
     await this.withTiming('graphql.ensureInitialized', () => this.ensureInitialized(), traceId);
 
     if (!this.endpoint) {
-      throw new Error('Authoring GraphQL endpoint not configured. Set sitecoreSerializationViewer.authoringGraphqlUrl or ensure .env.local has SITECORE_EDGE_HOSTNAME.');
+      throw new Error('Authoring GraphQL endpoint not configured. Set sitecoreSerializationExplorer.authoringGraphqlUrl or ensure .env.local has SITECORE_EDGE_HOSTNAME.');
     }
 
     const requestHeaders = await this.withTiming('graphql.buildHeaders', () => this.buildRequestHeaders(), traceId);

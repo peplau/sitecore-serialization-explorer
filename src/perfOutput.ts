@@ -63,7 +63,7 @@ export function isPerfTracingEnabled(): boolean {
     return true;
   }
 
-  const settingEnabled = vscode.workspace.getConfiguration('sitecoreSerializationViewer').get<boolean>('debug') === true;
+  const settingEnabled = vscode.workspace.getConfiguration('sitecoreSerializationExplorer').get<boolean>('debug') === true;
   if (settingEnabled) {
     return true;
   }
