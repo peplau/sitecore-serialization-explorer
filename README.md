@@ -1,8 +1,4 @@
 # Sitecore Serialization Explorer
-Sitecore Serialization Explorer is a Visual Studio Code extension that helps Sitecore developers visualize, inspect, validate, and edit Sitecore Content Serialization (SCS) configuration from inside the IDE.
-- Adds a custom view in Explorer: **Sitecore Serialization Explorer**.
-Initial public version of Sitecore Serialization Explorer with:
-# Sitecore Serialization Explorer
 
 Sitecore Serialization Explorer is a Visual Studio Code extension that helps Sitecore developers visualize, inspect, validate, and edit Sitecore Content Serialization (SCS) configuration from inside the IDE.
 
