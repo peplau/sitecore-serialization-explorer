@@ -193,7 +193,7 @@ All options can be set either as a **VS Code setting** (via `settings.json` or t
 
 Users appreciate release notes as you update your extension.
 
-### 0.0.1
+### 1.0.0
 
 Initial public version of Sitecore Serialization Explorer with:
 
