@@ -156,7 +156,7 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 
-		await vscode.commands.executeCommand('sitecore-serialization-viewer.showDetails', matchedItem);
+		await vscode.commands.executeCommand('sitecore-serialization-explorer.showDetails', matchedItem);
 
 		const roots = await treeProvider.getChildren();
 		const root = roots[0];

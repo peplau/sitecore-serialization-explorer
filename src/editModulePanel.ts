@@ -247,10 +247,10 @@ export class EditModulePanel {
     try {
       this.graphqlClient.setDatabase(database);
       const item = await this.graphqlClient.getItemByPath(itemPath) ?? this.buildFallbackItem(itemPath);
-      await vscode.commands.executeCommand('sitecore-serialization-viewer.showDetails', item);
+      await vscode.commands.executeCommand('sitecore-serialization-explorer.showDetails', item);
     } catch (error) {
       const fallbackItem = this.buildFallbackItem(itemPath);
-      await vscode.commands.executeCommand('sitecore-serialization-viewer.showDetails', fallbackItem);
+      await vscode.commands.executeCommand('sitecore-serialization-explorer.showDetails', fallbackItem);
     }
   }
 

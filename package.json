@@ -9,7 +9,7 @@
     "url": "https://github.com/peplau/sitecore-serialization-explorer.git"
   },
   "engines": {
-    "vscode": "^1.110.0"
+    "vscode": "^1.120.0"
   },
   "categories": [
     "Other"
@@ -58,39 +58,39 @@
     },
     "commands": [
       {
-        "command": "sitecore-serialization-viewer.helloWorld",
+        "command": "sitecore-serialization-explorer.helloWorld",
         "title": "Hello World"
       },
       {
-        "command": "sitecore-serialization-viewer.refreshTree",
+        "command": "sitecore-serialization-explorer.refreshTree",
         "title": "Refresh Content Tree",
         "icon": "$(refresh)"
       },
       {
-        "command": "sitecore-serialization-viewer.copyPath",
+        "command": "sitecore-serialization-explorer.copyPath",
         "title": "Copy Sitecore Path"
       },
       {
-        "command": "sitecore-serialization-viewer.showDetails",
+        "command": "sitecore-serialization-explorer.showDetails",
         "title": "Show Details"
       },
       {
-        "command": "sitecore-serialization-viewer.selectDatabase",
+        "command": "sitecore-serialization-explorer.selectDatabase",
         "title": "Select Sitecore Database",
         "icon": "$(database)"
       },
       {
-        "command": "sitecore-serialization-viewer.searchPath",
+        "command": "sitecore-serialization-explorer.searchPath",
         "title": "Search Sitecore Path",
         "icon": "$(search)"
       },
       {
-        "command": "sitecore-serialization-viewer.selectModule",
+        "command": "sitecore-serialization-explorer.selectModule",
         "title": "Select Module",
         "icon": "$(list-selection)"
       },
       {
-        "command": "sitecore-serialization-viewer.showAllModules",
+        "command": "sitecore-serialization-explorer.showAllModules",
         "title": "Show all modules",
         "icon": "$(library)"
       },
@@ -112,31 +112,31 @@
     "menus": {
       "view/title": [
         {
-          "command": "sitecore-serialization-viewer.refreshTree",
+          "command": "sitecore-serialization-explorer.refreshTree",
           "when": "view == sitecoreContentTree",
           "group": "navigation"
         },
         {
-          "command": "sitecore-serialization-viewer.searchPath",
+          "command": "sitecore-serialization-explorer.searchPath",
           "when": "view == sitecoreContentTree",
           "group": "navigation"
         },
         {
-          "command": "sitecore-serialization-viewer.showAllModules",
+          "command": "sitecore-serialization-explorer.showAllModules",
           "when": "view == sitecoreContentTree",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "sitecore-serialization-viewer.copyPath",
+          "command": "sitecore-serialization-explorer.copyPath",
           "when": "view == sitecoreContentTree",
           "group": "7_modification"
         }
       ],
       "editor/context": [
         {
-          "command": "sitecore-serialization-viewer.openModuleInEditUi",
+          "command": "sitecore-serialization-explorer.openModuleInEditUi",
           "when": "editorTextFocus && resourceExtname == .json",
           "group": "navigation"
         }
@@ -159,9 +159,9 @@
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
-    "@types/node": "^22.19.18",
-    "@types/vscode": "^1.110.0",
-    "@vscode/test-cli": "^0.0.12",
+    "@types/node": "^22.19.19",
+    "@types/vscode": "^1.120.0",
+    "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.3",
