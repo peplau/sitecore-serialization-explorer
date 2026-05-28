@@ -1295,6 +1295,74 @@ button { cursor: pointer; font: inherit; }
 .include-content {
   padding: 14px;
 }
+.include-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1.5px solid var(--card-border);
+  background: transparent;
+  margin: 0;
+  padding: 0 12px;
+  overflow: visible;
+  position: relative;
+}
+.include-tab {
+  background: color-mix(in srgb, var(--card-bg) 80%, var(--surface) 20%);
+  border: 1.5px solid var(--card-border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 20px 6px 20px;
+  margin: 0 3px 0 0;
+  cursor: pointer;
+  outline: none;
+  position: relative;
+  top: 1.5px;
+  transition: background 0.12s, color 0.12s;
+  z-index: 2;
+  letter-spacing: 0.02em;
+}
+.include-tab:last-child { margin-right: 0; }
+.include-tab.active {
+  background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--accent);
+  border-bottom: 1.5px solid var(--vscode-editor-background, #1e1e1e);
+  z-index: 3;
+}
+.include-tab:not(.active):hover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--card-bg) 92%);
+  color: var(--accent);
+}
+.include-tab-panel {
+  padding: 14px;
+}
+.include-overview-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.include-overview-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  align-items: baseline;
+}
+.include-overview-label {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-align: right;
+  text-transform: uppercase;
+}
+.include-overview-value {
+  font-size: 12px;
+  color: var(--text);
+  font-family: var(--vscode-font-family);
+  word-break: break-word;
+}
 .include-block.dragging {
   opacity: 0.65;
 }
@@ -2111,24 +2179,13 @@ button { cursor: pointer; font: inherit; }
 
     var rulesHtml = (inc.rules || []).map(ruleHtml).join('');
     var showTreeToggle = !!inc.isSaved;
-    var pathInfoHtml = showTreeToggle
-      ? '<span class="include-tree-path-info">' + esc(getIncludeQuickInfo(inc.scope, inc.database, inc.path)) + '</span>'
-      : '';
-    var treeToggleHtml = showTreeToggle
-      ? '<button type="button" class="include-tree-toggle" title="Show include content tree" aria-pressed="false">' +
-          '<svg class="include-tree-toggle-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-            '<circle cx="4" cy="3" r="1.5" fill="currentColor"></circle>' +
-            '<circle cx="12" cy="8" r="1.5" fill="currentColor"></circle>' +
-            '<circle cx="4" cy="13" r="1.5" fill="currentColor"></circle>' +
-            '<path d="M5.5 3H8.5V8H10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>' +
-            '<path d="M5.5 13H8.5V8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>' +
-          '</svg>' +
-          '<span>Show Tree</span>' +
-        '</button>'
-      : '';
+    var resolvedScope = String(inc.scope || '').trim() || 'ItemAndDescendants';
+    var resolvedDatabase = String(inc.database || '').trim() || 'master';
+    var resolvedPath = String(inc.path || '').trim();
+    var resolvedAllowedPushOperations = String(inc.allowedPushOperations || '').trim() || 'CreateUpdateAndDelete';
 
     var treePanelHtml = showTreeToggle
-      ? '<div class="include-tree-panel" hidden>' +
+      ? '<div class="include-tree-panel">' +
           '<div class="include-tree-toolbar">' +
             '<button type="button" class="btn-secondary-sm include-tree-refresh" title="Refresh include tree">Refresh Tree</button>' +
           '</div>' +
@@ -2136,65 +2193,78 @@ button { cursor: pointer; font: inherit; }
         '</div>'
       : '';
 
-    var treeControlsHtml = showTreeToggle
-      ? '<div class="include-tree-controls">' + treeToggleHtml + pathInfoHtml + '</div>'
-      : '';
-
-      return '<div class="include-block collapsed" data-id="' + id + '" data-include-name="' + esc(inc.name || '') + '">' +
+      return '<div class="include-block" data-id="' + id + '" data-include-name="' + esc(inc.name || '') + '">' +
         '<div class="include-group">' +
           '<div class="include-card">' +
             '<div class="include-header include-drag-handle" draggable="true">' +
               '<div class="include-title-row">' +
-                '<button type="button" class="include-toggle">▶</button>' +
                 jsonOpenLink('include', 'Open include JSON', inc.name || '(Unnamed)', ' data-include-name="' + esc(inc.name || '') + '"') +
               '</div>' +
-                '<div class="include-actions-row">' +
-                  '<button type="button" class="btn-danger-sm btn-remove-include">Remove Include</button>' +
+              '<div class="include-actions-row">' +
+                '<button type="button" class="btn-danger-sm btn-remove-include">Remove Include</button>' +
+              '</div>' +
+            '</div>' +
+            '<div class="include-tabs">' +
+              (showTreeToggle
+                ? '<button type="button" class="include-tab active" data-tab="overview">Overview</button>' +
+                  '<button type="button" class="include-tab" data-tab="edit">Edit</button>' +
+                  '<button type="button" class="include-tab" data-tab="tree">Content Tree</button>'
+                : '<button type="button" class="include-tab active" data-tab="edit">Edit</button>') +
+            '</div>' +
+            (showTreeToggle ? '<div class="include-tab-panel inc-panel-overview">' +
+              '<div class="include-overview-summary">' +
+                '<div class="include-overview-row"><span class="include-overview-label">Path</span><span class="include-overview-value">' + esc(resolvedPath) + '</span></div>' +
+                '<div class="include-overview-row"><span class="include-overview-label">Database</span><span class="include-overview-value">' + esc(resolvedDatabase) + '</span></div>' +
+                '<div class="include-overview-row"><span class="include-overview-label">Scope</span><span class="include-overview-value">' + esc(resolvedScope) + '</span></div>' +
+                '<div class="include-overview-row"><span class="include-overview-label">Allowed</span><span class="include-overview-value">' + esc(resolvedAllowedPushOperations) + '</span></div>' +
+              '</div>' +
+            '</div>' : '') +
+            '<div class="include-tab-panel inc-panel-edit"' + (showTreeToggle ? ' style="display:none"' : '') + '>' +
+              '<div class="fields-grid">' +
+                '<div class="field span-2">' +
+                  '<label>Name<span class="req">*</span></label>' +
+                  '<input class="inc-name" type="text" value="' + esc(inc.name) + '" required placeholder="e.g. Templates.Feature.Module.Name">' +
                 '</div>' +
+                '<div class="field span-2">' +
+                  '<label>Path<span class="req">*</span></label>' +
+                  '<input class="inc-path" type="text" value="' + esc(inc.path) + '" required placeholder="/sitecore/...">' +
+                '</div>' +
+                '<div class="field">' +
+                  '<label>Database</label>' +
+                  '<select class="inc-database">' + dbOpts + '</select>' +
+                '</div>' +
+                '<div class="field">' +
+                  '<label>Scope</label>' +
+                  '<select class="inc-scope">' +
+                    '<option value=""' + (!inc.scope ? ' selected' : '') + '>— Not set (default: ItemAndDescendants) —</option>' +
+                    opted(inc.scope, ['SingleItem', 'ItemAndChildren', 'ItemAndDescendants', 'DescendantsOnly', 'Ignored']) +
+                  '</select>' +
+                '</div>' +
+                '<div class="field">' +
+                  '<label>Allowed Push Operations</label>' +
+                  '<select class="inc-push-ops">' + incPushOpts + '</select>' +
+                '</div>' +
+                '<div class="field">' +
+                  '<label>Max Relative Path Length (default: 130)</label>' +
+                  '<input class="inc-max-depth" type="number" min="1" value="' + esc(inc.maxRelativeDepth) + '" placeholder="Optional">' +
+                '</div>' +
+              '</div>' +
+              '<div class="rules-section">' +
+                '<div class="rules-header">' +
+                  '<h3>Rules</h3>' +
+                  '<button type="button" class="btn-secondary-sm btn-add-rule">+ Add Rule</button>' +
+                '</div>' +
+                '<div class="rules-container">' + rulesHtml + '</div>' +
+              '</div>' +
             '</div>' +
-            '<div class="include-content">' +
-        '<div class="fields-grid">' +
-          '<div class="field span-2">' +
-            '<label>Name<span class="req">*</span></label>' +
-            '<input class="inc-name" type="text" value="' + esc(inc.name) + '" required placeholder="e.g. Templates.Feature.Module.Name">' +
-          '</div>' +
-          '<div class="field span-2">' +
-            '<label>Path<span class="req">*</span></label>' +
-            '<input class="inc-path" type="text" value="' + esc(inc.path) + '" required placeholder="/sitecore/...">' +
-          '</div>' +
-          '<div class="field">' +
-            '<label>Database</label>' +
-            '<select class="inc-database">' + dbOpts + '</select>' +
-          '</div>' +
-          '<div class="field">' +
-            '<label>Scope</label>' +
-            '<select class="inc-scope">' +
-              '<option value=""' + (!inc.scope ? ' selected' : '') + '>— Not set (default: ItemAndDescendants) —</option>' +
-              opted(inc.scope, ['SingleItem', 'ItemAndChildren', 'ItemAndDescendants', 'DescendantsOnly', 'Ignored']) +
-            '</select>' +
-          '</div>' +
-          '<div class="field">' +
-            '<label>Allowed Push Operations</label>' +
-            '<select class="inc-push-ops">' + incPushOpts + '</select>' +
-          '</div>' +
-          '<div class="field">' +
-            '<label>Max Relative Path Length (default: 130)</label>' +
-            '<input class="inc-max-depth" type="number" min="1" value="' + esc(inc.maxRelativeDepth) + '" placeholder="Optional">' +
+            (showTreeToggle ?
+              '<div class="include-tab-panel inc-panel-tree" style="display:none">' +
+                treePanelHtml +
+              '</div>'
+            : '') +
           '</div>' +
         '</div>' +
-        '<div class="rules-section">' +
-          '<div class="rules-header">' +
-            '<h3>Rules</h3>' +
-            '<button type="button" class="btn-secondary-sm btn-add-rule">+ Add Rule</button>' +
-          '</div>' +
-          '<div class="rules-container">' + rulesHtml + '</div>' +
-        '</div>' +
-            '</div>' +
-          '</div>' +
-          treeControlsHtml +
-        '</div>' +
-        treePanelHtml +
-    '</div>';
+      '</div>';
   }
 
   function excludedFieldsCardHtml(excludedFields) {
@@ -2319,64 +2389,81 @@ button { cursor: pointer; font: inherit; }
 
   function ensureSavedIncludeTreeControls() {
     document.querySelectorAll('.include-block').forEach(function(block) {
-      var controlsRow = block.querySelector('.include-tree-controls');
-      if (!controlsRow) {
-        controlsRow = document.createElement('div');
-        controlsRow.className = 'include-tree-controls';
-        var includeGroup = block.querySelector('.include-group');
-        if (includeGroup) {
-          includeGroup.appendChild(controlsRow);
-        } else {
-          block.appendChild(controlsRow);
-        }
-      }
-
-      if (!controlsRow) {
-        return;
-      }
-
-      var existingTreeToggle = controlsRow.querySelector('.include-tree-toggle');
-      if (!existingTreeToggle) {
-        var treeToggle = document.createElement('button');
-        treeToggle.type = 'button';
-        treeToggle.className = 'include-tree-toggle';
-        treeToggle.title = 'Show include content tree';
-        treeToggle.setAttribute('aria-pressed', 'false');
-        treeToggle.innerHTML =
-          '<svg class="include-tree-toggle-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-            '<circle cx="4" cy="3" r="1.5" fill="currentColor"></circle>' +
-            '<circle cx="12" cy="8" r="1.5" fill="currentColor"></circle>' +
-            '<circle cx="4" cy="13" r="1.5" fill="currentColor"></circle>' +
-            '<path d="M5.5 3H8.5V8H10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>' +
-            '<path d="M5.5 13H8.5V8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>' +
-          '</svg>' +
-          '<span>Show Tree</span>';
-        controlsRow.appendChild(treeToggle);
-      }
-
-      var pathInfoSpan = controlsRow.querySelector('.include-tree-path-info');
-      if (!pathInfoSpan) {
-        pathInfoSpan = document.createElement('span');
-        pathInfoSpan.className = 'include-tree-path-info';
-        controlsRow.appendChild(pathInfoSpan);
-      }
-
       var incScope = block.querySelector('.inc-scope') ? block.querySelector('.inc-scope').value : '';
       var incDatabase = block.querySelector('.inc-database') ? block.querySelector('.inc-database').value : 'master';
       var incPath = block.querySelector('.inc-path') ? block.querySelector('.inc-path').value : '';
-      pathInfoSpan.textContent = getIncludeQuickInfo(incScope, incDatabase, incPath);
+      var incAllowedPushOperations = block.querySelector('.inc-push-ops') ? block.querySelector('.inc-push-ops').value : '';
+      var resolvedScope = String(incScope || '').trim() || 'ItemAndDescendants';
+      var resolvedDatabase = String(incDatabase || '').trim() || 'master';
+      var resolvedPath = String(incPath || '').trim();
+      var resolvedAllowedPushOperations = String(incAllowedPushOperations || '').trim() || 'CreateUpdateAndDelete';
+
+      var tabs = block.querySelector('.include-tabs');
+      if (tabs) {
+        var overviewTab = tabs.querySelector('.include-tab[data-tab="overview"]');
+        if (!overviewTab) {
+          overviewTab = document.createElement('button');
+          overviewTab.type = 'button';
+          overviewTab.className = 'include-tab';
+          overviewTab.setAttribute('data-tab', 'overview');
+          overviewTab.textContent = 'Overview';
+          tabs.insertBefore(overviewTab, tabs.firstChild);
+        }
+
+        var treeTab = tabs.querySelector('.include-tab[data-tab="tree"]');
+        if (!treeTab) {
+          treeTab = document.createElement('button');
+          treeTab.type = 'button';
+          treeTab.className = 'include-tab';
+          treeTab.setAttribute('data-tab', 'tree');
+          treeTab.textContent = 'Content Tree';
+          tabs.appendChild(treeTab);
+        }
+      }
+
+      var overviewPanel = block.querySelector('.inc-panel-overview');
+      if (!overviewPanel) {
+        overviewPanel = document.createElement('div');
+        overviewPanel.className = 'include-tab-panel inc-panel-overview';
+        var editPanel = block.querySelector('.inc-panel-edit');
+        if (editPanel && editPanel.parentNode) {
+          editPanel.parentNode.insertBefore(overviewPanel, editPanel);
+        }
+      }
+
+      if (overviewPanel) {
+        overviewPanel.innerHTML =
+          '<div class="include-overview-summary">' +
+            '<div class="include-overview-row"><span class="include-overview-label">Path</span><span class="include-overview-value">' + esc(resolvedPath) + '</span></div>' +
+            '<div class="include-overview-row"><span class="include-overview-label">Database</span><span class="include-overview-value">' + esc(resolvedDatabase) + '</span></div>' +
+            '<div class="include-overview-row"><span class="include-overview-label">Scope</span><span class="include-overview-value">' + esc(resolvedScope) + '</span></div>' +
+            '<div class="include-overview-row"><span class="include-overview-label">Allowed</span><span class="include-overview-value">' + esc(resolvedAllowedPushOperations) + '</span></div>' +
+          '</div>';
+      }
 
       var existingPanel = block.querySelector('.include-tree-panel');
       if (!existingPanel) {
+        var treeHostPanel = block.querySelector('.inc-panel-tree');
+        if (!treeHostPanel) {
+          treeHostPanel = document.createElement('div');
+          treeHostPanel.className = 'include-tab-panel inc-panel-tree';
+          treeHostPanel.style.display = 'none';
+          var editPanelForTree = block.querySelector('.inc-panel-edit');
+          if (editPanelForTree && editPanelForTree.parentNode) {
+            editPanelForTree.parentNode.appendChild(treeHostPanel);
+          }
+        }
+
         var panel = document.createElement('div');
         panel.className = 'include-tree-panel';
-        panel.hidden = true;
         panel.innerHTML =
           '<div class="include-tree-toolbar">' +
             '<button type="button" class="btn-secondary-sm include-tree-refresh" title="Refresh include tree">Refresh Tree</button>' +
           '</div>' +
           '<div class="include-tree-root"></div>';
-        block.appendChild(panel);
+        if (treeHostPanel) {
+          treeHostPanel.appendChild(panel);
+        }
       }
     });
   }
@@ -2622,6 +2709,28 @@ button { cursor: pointer; font: inherit; }
   document.addEventListener('click', function(evt) {
     var target = evt.target;
     if (!(target instanceof Element)) { return; }
+
+    // Include tab switching
+    var clickedTab = target.closest('.include-tab');
+    if (clickedTab) {
+      var incBlock = clickedTab.closest('.include-block');
+      if (incBlock) {
+        incBlock.querySelectorAll('.include-tab').forEach(function(t) { t.classList.remove('active'); });
+        incBlock.querySelectorAll('.include-tab-panel').forEach(function(p) { p.style.display = 'none'; });
+        clickedTab.classList.add('active');
+        var tabName = clickedTab.getAttribute('data-tab');
+        var panel = incBlock.querySelector('.inc-panel-' + tabName);
+        if (panel) {
+          panel.style.display = '';
+          if (tabName === 'tree') {
+            loadIncludeTree(incBlock, false);
+          }
+        }
+      }
+      evt.preventDefault();
+      evt.stopPropagation();
+      return;
+    }
 
       // Open JSON at the section requested by the icon
       var jsonTrigger = target.closest('.json-open-link');
