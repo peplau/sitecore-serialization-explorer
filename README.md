@@ -2,25 +2,26 @@
 
 Sitecore Serialization Explorer is a Visual Studio Code extension that helps Sitecore developers visualize, inspect, validate, and edit Sitecore Content Serialization (SCS) configuration from inside the IDE.
 
-It provides:
+Main Features:
 
-- A live Sitecore Content Tree (via Authoring GraphQL).
+**1) A live Sitecore Content Tree (via Authoring GraphQL):**
 
 ![](assets/20260529_122847_image.png)
 
-- Serialization status visualization (direct, indirect, untracked, not serialized).
+**2) Serialization status visualization (direct, indirect, untracked, not serialized):**
 
 | Serialized (colored) | Not Serialized (grayed out) |
 | --- | --- | 
 | ![](assets/20260529_123850_image.png) | ![](assets/20260529_123910_image.png) |
-  
-  
-- Integrated `explain` analysis (by clicking in a tree node).
-  <img src="assets/20260529_124503_image.png" width="700"/>
-- Module-level exploration across configured `json` files.
-  <img src="assets/20260529_125144_image.png" width="700"/>
-- In-editor module configuration editing for includes, rules, excluded fields, roles, and users.
-  <img src="assets/20260529_125331_image.png" width="700"/>
+
+**3) Integrated `explain` analysis (by clicking in a tree node).**
+<img src="assets/20260529_124503_image.png" width="700"/>
+
+**4) Module-level exploration across configured `json` files.**
+<img src="assets/20260529_125144_image.png" width="700"/>
+
+**5) In-editor module configuration editing for includes, rules, excluded fields, roles, and users.**
+<img src="assets/20260529_125331_image.png" width="700"/>
 
 ## Installation
 
