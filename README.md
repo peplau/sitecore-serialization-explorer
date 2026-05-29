@@ -6,8 +6,10 @@ It provides:
 
 - A live Sitecore Content Tree (via Authoring GraphQL).
   ![](assets/20260529_122847_image.png)
+
 - Serialization status visualization (direct, indirect, untracked, not serialized).
-  | Serialized (colored) | Not Serialized (grayed out) |
+
+| Serialized (colored) | Not Serialized (grayed out) |
 | --- | --- | 
 | ![](assets/20260529_123850_image.png) | ![](assets/20260529_123910_image.png) |
   
