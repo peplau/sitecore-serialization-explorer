@@ -14,7 +14,7 @@ Main Features:
 | --- | --- | 
 | ![](assets/20260529_123850_image.png) | ![](assets/20260529_123910_image.png) |
 
-**3) Integrated `explain` analysis (by clicking in a tree node).**
+**3) Integrated `explain` analysis.**
 <img src="assets/20260529_124503_image.png" width="700"/>
 
 **4) Module-level exploration across configured `json` files.**

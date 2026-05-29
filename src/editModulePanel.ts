@@ -100,6 +100,7 @@ interface IncludeTreeLoadMessage {
   includeName?: string;
   includePath: string;
   database?: string;
+  forceRefresh?: boolean;
 }
 
 interface IncludeTreeChildrenMessage {
@@ -630,6 +631,15 @@ export class EditModulePanel {
     return cached;
   }
 
+  private invalidateIncludeSerializationScope(includeId: string, includeName: string, database: string): void {
+    if (includeId) {
+      this.includeScopeByIncludeId.delete(includeId);
+    }
+
+    const scopeKey = `${(includeName || '').trim().toLowerCase()}|${this.normalizeDatabase(database).toLowerCase()}`;
+    this.includeScopeCache.delete(scopeKey);
+  }
+
   private applyIncludeScopedStatus(item: SitecoreItem, scope: IncludeSerializationScope): SitecoreItem {
     const normalizedItemPath = this.normalizePath(item.path);
     if (!normalizedItemPath) {
@@ -708,6 +718,7 @@ export class EditModulePanel {
     const includeName = (message.includeName || '').trim();
     const includePath = (message.includePath || '').trim();
     const database = this.normalizeDatabase(message.database);
+    const forceRefresh = message.forceRefresh === true;
 
     if (!includePath) {
       void this.panel.webview.postMessage({
@@ -721,6 +732,9 @@ export class EditModulePanel {
 
     try {
       this.graphqlClient.setDatabase(database);
+      if (forceRefresh) {
+        this.invalidateIncludeSerializationScope(includeId, includeName, database);
+      }
       const includePathItem = await this.graphqlClient.getItemByPath(includePath);
       const scope = await this.resolveIncludeSerializationScope(includeName, database);
       this.includeScopeByIncludeId.set(includeId, scope);
@@ -1884,7 +1898,8 @@ button { cursor: pointer; font: inherit; }
       includeId: includeId,
       includeName: includeName,
       includePath: includePath,
-      database: database
+      database: database,
+      forceRefresh: !!forceRefresh
     });
   }
 

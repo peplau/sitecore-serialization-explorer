@@ -26,8 +26,14 @@ interface ModuleSerializationSource {
   users: ModulePrincipalPredicate[];
   jsonUri: vscode.Uri;
   rootUri: vscode.Uri;
+  yamlRootUris: vscode.Uri[];
   includes: ModuleSerializationInclude[];
   pathConfigs: ModuleSerializationPathConfig[];
+}
+
+interface ConfiguredModuleJsonEntry {
+  jsonUri: vscode.Uri;
+  yamlRootUris: vscode.Uri[];
 }
 
 interface ModulePrincipalPredicate {
@@ -314,16 +320,24 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       users: this.normalizePrincipalPredicates(moduleJson.users),
       jsonUri,
       rootUri: vscode.Uri.file(path.dirname(jsonUri.fsPath)),
+      yamlRootUris: [],
       includes,
       pathConfigs: this.flattenPathConfigs(includes)
     };
 
-    const itemYamlPattern = new vscode.RelativePattern(source.rootUri, 'items/**/*.{yml,yaml}');
+    const configuredSources = await this.loadModuleSerializationSources();
+    const normalizedJsonPath = this.normalizeFileSystemKey(jsonUri.fsPath);
+    const configuredSource = configuredSources.find(entry => this.normalizeFileSystemKey(entry.jsonUri.fsPath) === normalizedJsonPath)
+      || configuredSources.find(entry => this.normalizeModuleName(entry.moduleName) === this.normalizeModuleName(moduleName));
+    source.yamlRootUris = configuredSource?.yamlRootUris && configuredSource.yamlRootUris.length > 0
+      ? configuredSource.yamlRootUris
+      : await this.getYamlSearchRoots(jsonUri);
+
     const itemYamlUris = await this.withTiming(
       'items.findItemYamlFiles',
-      () => vscode.workspace.findFiles(itemYamlPattern),
+      () => this.findYamlFilesUnderRoots(source.yamlRootUris, '**/*.{yml,yaml}'),
       traceId,
-      `root=${source.rootUri.fsPath}`
+      `roots=${source.yamlRootUris.map(uri => uri.fsPath).join(';')}`
     );
     const contentYamlUris: vscode.Uri[] = [];
     const roleYamlUris: vscode.Uri[] = [];
@@ -331,13 +345,13 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
 
     await this.withTiming('items.classifyYamlFiles', () => {
       for (const yamlUri of itemYamlUris) {
-        const relativeYamlPath = path.relative(source.rootUri.fsPath, yamlUri.fsPath).replace(/\\/g, '/').toLowerCase();
-        if (this.isPrincipalSerializationPath(relativeYamlPath, 'Role')) {
+        const yamlPathForClassification = yamlUri.fsPath.replace(/\\/g, '/').toLowerCase();
+        if (this.isPrincipalSerializationPath(yamlPathForClassification, 'Role')) {
           roleYamlUris.push(yamlUri);
           continue;
         }
 
-        if (this.isPrincipalSerializationPath(relativeYamlPath, 'User')) {
+        if (this.isPrincipalSerializationPath(yamlPathForClassification, 'User')) {
           userYamlUris.push(yamlUri);
           continue;
         }
@@ -458,13 +472,13 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
 
     const roleItems = await this.withTiming(
       'items.buildRoleRows',
-      () => this.buildPrincipalRows(roleYamlUris, source.rootUri, source.roles, 'Role', traceId),
+      () => this.buildPrincipalRows(roleYamlUris, source.roles, 'Role', traceId),
       traceId,
       `files=${roleYamlUris.length}`
     );
     const userItems = await this.withTiming(
       'items.buildUserRows',
-      () => this.buildPrincipalRows(userYamlUris, source.rootUri, source.users, 'User', traceId),
+      () => this.buildPrincipalRows(userYamlUris, source.users, 'User', traceId),
       traceId,
       `files=${userYamlUris.length}`
     );
@@ -539,7 +553,6 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
 
   private async buildPrincipalRows(
     yamlUris: vscode.Uri[],
-    rootUri: vscode.Uri,
     predicates: ModulePrincipalPredicate[],
     principalType: 'Role' | 'User',
     traceId?: string
@@ -565,7 +578,7 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       parseMsTotal += Date.now() - parseStartedAt;
 
       const deriveStartedAt = Date.now();
-      const relativeYamlPath = path.relative(rootUri.fsPath, yamlUri.fsPath).replace(/\\/g, '/');
+      const relativeYamlPath = yamlUri.fsPath.replace(/\\/g, '/').replace(/^\/+/, '');
       const principal = parsed.principal || this.derivePrincipalFromRelativePath(relativeYamlPath, principalType);
       deriveMsTotal += Date.now() - deriveStartedAt;
       if (!principal) {
@@ -1114,12 +1127,13 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
     for (let i = 0; i < lines.length; i++) {
       const idMatch = lines[i].match(/^ID:\s*(.+)\s*$/);
       if (idMatch) {
-        parsedId = idMatch[1].trim();
+        parsedId = idMatch[1].trim().replace(/^['"]|['"]$/g, '');
       }
 
       const pathMatch = lines[i].match(/^Path:\s*(.+)\s*$/);
       if (pathMatch) {
-        parsedPath = this.normalizePath(pathMatch[1]);
+        const normalizedPathValue = pathMatch[1].trim().replace(/^['"]|['"]$/g, '');
+        parsedPath = this.normalizePath(normalizedPathValue);
       }
 
       const hintMatch = lines[i].match(/^\s*Hint:\s*(.+)\s*$/i);
@@ -1202,9 +1216,106 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
     return vscode.workspace.findFiles(new vscode.RelativePattern(workspaceFolder, '**/sitecore.json'), this.getExcludePattern());
   }
 
-  private async loadConfiguredModuleJsonUris(): Promise<vscode.Uri[]> {
+  private normalizeFileSystemKey(value: string): string {
+    return value.replace(/\\/g, '/').toLowerCase();
+  }
+
+  private getModuleGlobBaseDirectory(configDirectory: string, moduleGlob: string): string {
+    const normalizedGlob = (moduleGlob || '').trim().replace(/\\/g, '/');
+    if (!normalizedGlob) {
+      return configDirectory;
+    }
+
+    const wildcardIndex = normalizedGlob.search(/[\*\?\[{]/);
+    if (wildcardIndex < 0) {
+      return path.resolve(configDirectory, path.dirname(normalizedGlob));
+    }
+
+    const staticPrefix = normalizedGlob.slice(0, wildcardIndex).replace(/\/+$/, '');
+    if (!staticPrefix) {
+      return configDirectory;
+    }
+
+    return path.resolve(configDirectory, staticPrefix);
+  }
+
+  private getModuleFolderCandidates(jsonUri: vscode.Uri): vscode.Uri[] {
+    const jsonDir = path.dirname(jsonUri.fsPath);
+    const jsonFileName = path.basename(jsonUri.fsPath);
+    const fileNameWithoutExt = jsonFileName.replace(/\.json$/i, '');
+    const moduleFileName = jsonFileName.replace(/\.module\.json$/i, '');
+    const candidates: vscode.Uri[] = [];
+    const pushCandidate = (candidatePath: string) => {
+      candidates.push(vscode.Uri.file(candidatePath));
+    };
+
+    if (moduleFileName !== jsonFileName) {
+      pushCandidate(path.join(jsonDir, moduleFileName));
+      pushCandidate(path.join(path.dirname(jsonDir), moduleFileName));
+    }
+
+    if (fileNameWithoutExt && fileNameWithoutExt !== moduleFileName) {
+      pushCandidate(path.join(jsonDir, fileNameWithoutExt));
+      pushCandidate(path.join(path.dirname(jsonDir), fileNameWithoutExt));
+    }
+
+    return candidates;
+  }
+
+  private async getExistingDirectories(uris: vscode.Uri[]): Promise<vscode.Uri[]> {
+    const existing: vscode.Uri[] = [];
+    const seen = new Set<string>();
+
+    for (const uri of uris) {
+      const key = this.normalizeFileSystemKey(uri.fsPath);
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      try {
+        const stat = await vscode.workspace.fs.stat(uri);
+        if ((stat.type & vscode.FileType.Directory) === vscode.FileType.Directory) {
+          existing.push(uri);
+        }
+      } catch {
+        // Skip missing directories.
+      }
+    }
+
+    return existing;
+  }
+
+  private async getYamlSearchRoots(jsonUri: vscode.Uri, moduleGlobBaseDir?: string): Promise<vscode.Uri[]> {
+    const roots: vscode.Uri[] = [
+      vscode.Uri.file(path.dirname(jsonUri.fsPath)),
+      ...this.getModuleFolderCandidates(jsonUri)
+    ];
+
+    if (moduleGlobBaseDir) {
+      roots.push(vscode.Uri.file(moduleGlobBaseDir));
+    }
+
+    return this.getExistingDirectories(roots);
+  }
+
+  private async findYamlFilesUnderRoots(rootUris: vscode.Uri[], includePattern: string): Promise<vscode.Uri[]> {
+    const discovered = new Map<string, vscode.Uri>();
+
+    for (const rootUri of rootUris) {
+      const pattern = new vscode.RelativePattern(rootUri, includePattern);
+      const found = await vscode.workspace.findFiles(pattern, this.getExcludePattern());
+      for (const fileUri of found) {
+        discovered.set(this.normalizeFileSystemKey(fileUri.fsPath), fileUri);
+      }
+    }
+
+    return Array.from(discovered.values());
+  }
+
+  private async loadConfiguredModuleJsonEntries(): Promise<ConfiguredModuleJsonEntry[]> {
     const sitecoreConfigUris = await this.findSitecoreConfigUris();
-    const moduleUrisByPath = new Map<string, vscode.Uri>();
+    const entriesByPath = new Map<string, ConfiguredModuleJsonEntry>();
 
     for (const sitecoreConfigUri of sitecoreConfigUris) {
       const sitecoreConfig = await this.readJsonFile<{ modules?: string[] }>(sitecoreConfigUri);
@@ -1215,14 +1326,27 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
 
       const configDirectory = path.dirname(sitecoreConfigUri.fsPath);
       for (const moduleGlob of moduleGlobs) {
+        const moduleGlobBaseDir = this.getModuleGlobBaseDirectory(configDirectory, moduleGlob);
         const matchedUris = await vscode.workspace.findFiles(new vscode.RelativePattern(configDirectory, moduleGlob), this.getExcludePattern());
         for (const matchedUri of matchedUris) {
-          moduleUrisByPath.set(matchedUri.fsPath.toLowerCase(), matchedUri);
+          const key = this.normalizeFileSystemKey(matchedUri.fsPath);
+          const existing = entriesByPath.get(key);
+          const yamlRoots = await this.getYamlSearchRoots(matchedUri, moduleGlobBaseDir);
+
+          if (!existing) {
+            entriesByPath.set(key, {
+              jsonUri: matchedUri,
+              yamlRootUris: yamlRoots
+            });
+            continue;
+          }
+
+          existing.yamlRootUris = await this.getExistingDirectories([...existing.yamlRootUris, ...yamlRoots]);
         }
       }
     }
 
-    return Array.from(moduleUrisByPath.values());
+    return Array.from(entriesByPath.values());
   }
 
   private resolveRulePath(parentPath: string | undefined, rulePath: string | undefined): string | undefined {
@@ -1297,11 +1421,12 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       }
     }
 
-    const moduleJsonUris = await this.loadConfiguredModuleJsonUris();
+    const moduleEntries = await this.loadConfiguredModuleJsonEntries();
     const sources: ModuleSerializationSource[] = [];
     this.moduleSerializationSourceCache.clear();
 
-    for (const jsonUri of moduleJsonUris) {
+    for (const entry of moduleEntries) {
+      const jsonUri = entry.jsonUri;
       const json = await this.readJsonFile<{
         namespace?: string;
         description?: string;
@@ -1325,6 +1450,7 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
         users: this.normalizePrincipalPredicates(json?.users),
         jsonUri,
         rootUri: vscode.Uri.file(path.dirname(jsonUri.fsPath)),
+        yamlRootUris: entry.yamlRootUris,
         includes,
         pathConfigs: this.flattenPathConfigs(includes)
       };
@@ -1508,15 +1634,6 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       .filter(predicate => !!predicate.pattern);
   }
 
-  private async findModuleRootDirs(moduleName: string): Promise<vscode.Uri[]> {
-    const source = await this.getModuleSerializationSource(moduleName);
-    if (!source) {
-      return [];
-    }
-
-    return [source.rootUri];
-  }
-
   private async ensureModuleYamlTreeLoaded(requestGeneration: number, traceId?: string): Promise<void> {
     if (!this.isModuleFilterActive()) {
       return;
@@ -1533,7 +1650,7 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
     this.moduleRootItemsByPath.clear();
 
     const source = await this.getModuleSerializationSource(this.selectedModule);
-    const moduleRootDirs = source ? [source.rootUri] : [];
+    const moduleRootDirs = source?.yamlRootUris || [];
 
     if (requestGeneration !== this.loadGeneration) {
       return;
@@ -1546,10 +1663,9 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
         return;
       }
 
-      const yamlPattern = new vscode.RelativePattern(rootDir, 'items/**/*.{yml,yaml}');
       const yamlUris = await this.withTiming(
         'moduleYaml.findFiles',
-        () => vscode.workspace.findFiles(yamlPattern),
+        () => this.findYamlFilesUnderRoots([rootDir], '**/*.{yml,yaml}'),
         traceId,
         `root=${rootDir.fsPath}`
       );

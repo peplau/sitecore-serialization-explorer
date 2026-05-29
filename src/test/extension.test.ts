@@ -16,6 +16,20 @@ suite('Extension Test Suite', () => {
 		assert.strictEqual(includeName, 'Content.Site.Vizient');
 	});
 
+	test('infers include from nested items directories', () => {
+		const service = SerializationConfigService.getInstance();
+		const includeName = service.inferIncludeFromYamlPath('D:/Git/Vizient/dxp-sitecoreai/authoring/items/nextjs-starter/items/Feature.Navigation/site/home.yml');
+
+		assert.strictEqual(includeName, 'Feature.Navigation');
+	});
+
+	test('returns undefined when yaml path has no items segment', () => {
+		const service = SerializationConfigService.getInstance();
+		const includeName = service.inferIncludeFromYamlPath('D:/Git/Vizient/dxp-sitecoreai/authoring/items/nextjs-starter/DefaultRenderingHost/Default.yml');
+
+		assert.strictEqual(includeName, undefined);
+	});
+
 	test('resolves include details case-insensitively', () => {
 		const service = SerializationConfigService.getInstance();
 		const includeInfo = service.getIncludeInfo('_vizient.main', 'content.site.vizient');

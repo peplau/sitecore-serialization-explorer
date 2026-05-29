@@ -248,9 +248,19 @@ export class SerializationConfigService {
     }
 
     const normalizedYamlPath = yamlPath.replace(/\\/g, '/');
-    const itemsMatch = normalizedYamlPath.match(/\/items\/([^/]+)\//i);
-    if (itemsMatch?.[1]) {
-      return itemsMatch[1];
+    const normalizedLower = normalizedYamlPath.toLowerCase();
+    const marker = '/items/';
+    let markerIndex = normalizedLower.lastIndexOf(marker);
+
+    while (markerIndex >= 0) {
+      const includeStart = markerIndex + marker.length;
+      const remainder = normalizedYamlPath.slice(includeStart);
+      const includeCandidate = remainder.split('/').find(segment => segment.length > 0);
+      if (includeCandidate) {
+        return includeCandidate;
+      }
+
+      markerIndex = normalizedLower.lastIndexOf(marker, markerIndex - 1);
     }
 
     return undefined;
