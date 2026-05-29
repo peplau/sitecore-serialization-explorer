@@ -83,6 +83,17 @@ interface IncludeFormData {
   rules: RuleFormData[];
 }
 
+interface IncludeWebviewData {
+  isSaved: boolean;
+  name: string;
+  path: string;
+  database: string;
+  scope: string;
+  allowedPushOperations: string;
+  maxRelativeDepth: number | '';
+  rules: Array<RuleFormData & { allowedPushOperations: string }>;
+}
+
 interface ModuleSaveData {
   namespace: string;
   description: string;
@@ -317,6 +328,24 @@ export class EditModulePanel {
     this.panel.webview.html = this.buildHtml();
   }
 
+  private mapIncludesForWebview(includes: IncludeJson[]): IncludeWebviewData[] {
+    return includes.map(inc => ({
+      isSaved: true,
+      name: inc.name ?? '',
+      path: inc.path ?? '',
+      database: inc.database ?? '',
+      scope: inc.scope ?? '',
+      allowedPushOperations: inc.allowedPushOperations ?? '',
+      maxRelativeDepth: typeof inc.maxRelativeDepth === 'number' ? inc.maxRelativeDepth : '',
+      rules: (inc.rules ?? []).map(rule => ({
+        path: rule.path ?? '',
+        scope: rule.scope ?? '',
+        alias: rule.alias ?? '',
+        allowedPushOperations: rule.allowedPushOperations ?? '__inherited__'
+      }))
+    }));
+  }
+
   private async saveModule(data: ModuleSaveData): Promise<void> {
     const existingIncludes = Array.isArray(this.rawJson.items?.includes) ? this.rawJson.items?.includes ?? [] : [];
     const existingExcludedFields = Array.isArray(this.rawJson.items?.excludedFields) ? this.rawJson.items.excludedFields : [];
@@ -466,7 +495,10 @@ export class EditModulePanel {
       );
       this.rawJson = merged;
       this.panel.title = 'Edit: ' + (merged.namespace ?? 'Module');
-      this.panel.webview.postMessage({ command: 'saved' });
+      this.panel.webview.postMessage({
+        command: 'saved',
+        includes: this.mapIncludesForWebview(nextIncludes)
+      });
       vscode.window.showInformationMessage('Module "' + (merged.namespace ?? '') + '" saved.');
     } catch (err) {
       vscode.window.showErrorMessage('Failed to save: ' + (err instanceof Error ? err.message : String(err)));
@@ -2404,14 +2436,27 @@ button { cursor: pointer; font: inherit; }
 
   function ensureSavedIncludeTreeControls() {
     document.querySelectorAll('.include-block').forEach(function(block) {
+      var includeNameInput = block.querySelector('.inc-name');
       var incScope = block.querySelector('.inc-scope') ? block.querySelector('.inc-scope').value : '';
       var incDatabase = block.querySelector('.inc-database') ? block.querySelector('.inc-database').value : 'master';
       var incPath = block.querySelector('.inc-path') ? block.querySelector('.inc-path').value : '';
       var incAllowedPushOperations = block.querySelector('.inc-push-ops') ? block.querySelector('.inc-push-ops').value : '';
+      var resolvedName = includeNameInput ? String(includeNameInput.value || '').trim() : '';
       var resolvedScope = String(incScope || '').trim() || 'ItemAndDescendants';
       var resolvedDatabase = String(incDatabase || '').trim() || 'master';
       var resolvedPath = String(incPath || '').trim();
       var resolvedAllowedPushOperations = String(incAllowedPushOperations || '').trim() || 'CreateUpdateAndDelete';
+
+      block.setAttribute('data-include-name', resolvedName);
+
+      var includeHeaderLink = block.querySelector('.include-title-row .json-open-link');
+      if (includeHeaderLink) {
+        includeHeaderLink.setAttribute('data-include-name', resolvedName);
+        var includeHeaderText = includeHeaderLink.querySelector('.json-open-link-text');
+        if (includeHeaderText) {
+          includeHeaderText.textContent = resolvedName || '(Unnamed)';
+        }
+      }
 
       var tabs = block.querySelector('.include-tabs');
       if (tabs) {
@@ -2434,6 +2479,10 @@ button { cursor: pointer; font: inherit; }
           treeTab.textContent = 'Content Tree';
           tabs.appendChild(treeTab);
         }
+
+        tabs.querySelectorAll('.include-tab').forEach(function(tab) {
+          tab.classList.toggle('active', tab.getAttribute('data-tab') === 'overview');
+        });
       }
 
       var overviewPanel = block.querySelector('.inc-panel-overview');
@@ -2480,6 +2529,10 @@ button { cursor: pointer; font: inherit; }
           treeHostPanel.appendChild(panel);
         }
       }
+
+      block.querySelectorAll('.include-tab-panel').forEach(function(panel) {
+        panel.style.display = panel.classList.contains('inc-panel-overview') ? '' : 'none';
+      });
     });
   }
 
@@ -3217,7 +3270,13 @@ button { cursor: pointer; font: inherit; }
       var feedback = document.getElementById('feedback');
       feedback.textContent = 'Saved \u2713';
       feedback.className = 'feedback ok';
-      ensureSavedIncludeTreeControls();
+      if (Array.isArray(event.data.includes)) {
+        data.includes = event.data.includes;
+        idCounter = data.includes.length;
+        renderIncludes();
+      } else {
+        ensureSavedIncludeTreeControls();
+      }
       captureSavedFormState();
       setTimeout(function() { feedback.textContent = ''; }, 2500);
       return;
