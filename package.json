@@ -103,7 +103,7 @@
       "explorer": [
         {
           "id": "sitecoreContentTree",
-          "name": "Sitecore Serialization Viewer",
+          "name": "Sitecore Serialization Explorer",
           "icon": "$(folder)",
           "contextualTitle": "Sitecore Serialization Explorer"
         }

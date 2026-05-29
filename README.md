@@ -10,6 +10,40 @@ It provides:
 - Module-level exploration across configured `json` files.
 - In-editor module configuration editing for includes, rules, excluded fields, roles, and users.
 
+## Installation
+
+Install the module using one of the options below:
+
+1. Search for "Sitecore Serialization Explorer" and install using Visual Studio Code Extensions
+2. Search for "Sitecore Serialization Explorer" and install using Visual Studio Marketplace [Link Here]
+3. Download and install from the [GitHub Repository](https://github.com/peplau/sitecore-serialization-explorer)
+
+## Configuration
+
+1. Open your solution folder in Visual Studio Code
+2. Create a file for environment variables (Eg:/.env.local) at the root of your folder and add the variables:
+
+| Variable Name | How to obtain it |
+| --- | --- |
+| SITECORE_EDGE_HOSTNAME | SitecoreAI Deploy > Projects > [Your Project] > [Environment] > Details > Scroll down to "Preview GraphQL IDE" > Launch IDE > Copy the CURL |
+| SITECORE_EDGE_CONTEXT_ID | SitecoreAI Deploy > Projects > [Your Project] > [Environment] > Developer settings > Make sure Context has "Preview" as selected > Copy the SITECORE_EDGE_CONTEXT_ID variable from here |
+
+> It is recommended that you point to the "Preview" version of your "Development" Environment for serialization
+
+3. Restart Visual Studio Code (CTRL+R)
+
+## Authentication
+
+This extension uses the same session used by the Sitecore CLI Serialization, reading its configurations from the .sitecore/user. The authentication is typically made by opening the root of your repository in a terminal window and typing:
+
+```
+dotnet sitecore cloud login --allow-write true
+```
+
+After that, click on the Refresh button at the Sitecore Serialization Explorer window, at the left column of VSCode's Explorer tab:
+
+![](assets/20260529_121406_image.png)
+
 ## Features
 
 ### 1) Explorer View: Sitecore Content Tree
@@ -41,8 +75,8 @@ During background reconciliation, unresolved nodes show a pending icon while sta
 Command: **Search Sitecore Path**
 
 - Accepts either:
-	- A Sitecore path (for example, `/sitecore/content/home`)
-	- A Sitecore item GUID (for example, `{FBFE3DAE-E317-4DCE-97D2-94C806896642}`)
+  - A Sitecore path (for example, `/sitecore/content/home`)
+  - A Sitecore item GUID (for example, `{FBFE3DAE-E317-4DCE-97D2-94C806896642}`)
 - Reveals the item in the tree and opens details.
 
 ### 5) Database Selector (Status Bar)
@@ -91,15 +125,15 @@ Command: **Show all modules**
 From Explain or Modules panel, **View Items** opens a module items breakdown:
 
 - Groups results by:
-	- Master database items
-	- Core database items
-	- Roles
-	- Users
+  - Master database items
+  - Core database items
+  - Roles
+  - Users
 - For each row, shows path/value, status (direct/indirect), include/rule source, and YAML path.
 - Supports:
-	- Open YAML
-	- Copy path/value
-	- Copy item ID (when available)
+  - Open YAML
+  - Copy path/value
+  - Copy item ID (when available)
 
 ### 10) In-Editor Module JSON Editor
 
@@ -221,3 +255,4 @@ You can author this README using Visual Studio Code. Useful editor shortcuts:
 
 - [Visual Studio Code Markdown Support](https://code.visualstudio.com/docs/languages/markdown)
 - [Markdown Syntax Reference](https://www.markdownguide.org/basic-syntax/)
+
