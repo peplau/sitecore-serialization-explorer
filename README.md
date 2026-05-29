@@ -5,6 +5,7 @@ Sitecore Serialization Explorer is a Visual Studio Code extension that helps Sit
 It provides:
 
 - A live Sitecore Content Tree (via Authoring GraphQL).
+
 ![](assets/20260529_122847_image.png)
 
 - Serialization status visualization (direct, indirect, untracked, not serialized).
