@@ -6,7 +6,7 @@ Main Features:
 
 **1) A live Sitecore Content Tree (via Authoring GraphQL):**
 
-![](assets/20260529_122847_image.png)
+![](assets/20260529_141823_image.png)
 
 **2) Serialization status visualization (direct, indirect, untracked, not serialized):**
 
