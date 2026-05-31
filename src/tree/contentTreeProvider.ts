@@ -121,6 +121,8 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
   private scheduledTreeRefresh: ReturnType<typeof setTimeout> | undefined;
   private iconDataUriCache: Map<string, string> = new Map();
   private iconFetchInFlight: Set<string> = new Set();
+  private moduleItemIconHydrationInFlight: Set<string> = new Set();
+  private itemIconUrlByPath: Map<string, string> = new Map();
 
   constructor() {
     this.client = new AuthoringGraphqlClient();
@@ -928,6 +930,27 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
   }
 
   private createTreeItem(item: SitecoreItem): SitecoreTreeItem {
+    if (this.isModuleFilterActive() && !!item.yamlPath) {
+      const defaultIconUrl = this.client.getDefaultItemIconUrl();
+      const pathKey = this.normalizePath(item.path).toLowerCase();
+      const cachedIconUrl = this.itemIconUrlByPath.get(pathKey);
+      if (cachedIconUrl) {
+        item.iconUrl = cachedIconUrl;
+      } else {
+        if (!item.iconUrl && defaultIconUrl) {
+          item.iconUrl = defaultIconUrl;
+        }
+
+        if (!item.iconUrl || (!!defaultIconUrl && item.iconUrl === defaultIconUrl)) {
+          this.hydrateModuleItemIcon(item);
+        }
+      }
+
+      if (!item.iconUrl) {
+        item.iconUrl = defaultIconUrl;
+      }
+    }
+
     const iconDataUri = this.getIconDataUri(item.iconUrl);
     const iconFetching = !!item.iconUrl && !iconDataUri;
     if (iconFetching) {
@@ -946,6 +969,74 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       ...item,
       name: item.path
     });
+  }
+
+  private applyIconUrlToModuleItem(pathKey: string, iconUrl: string): boolean {
+    for (const [itemPath, moduleItem] of this.moduleYamlItemsByPath.entries()) {
+      if (itemPath.toLowerCase() !== pathKey) {
+        continue;
+      }
+
+      if (moduleItem.iconUrl === iconUrl) {
+        return false;
+      }
+
+      moduleItem.iconUrl = iconUrl;
+      return true;
+    }
+
+    return false;
+  }
+
+  private hydrateModuleItemIcon(item: SitecoreItem): void {
+    if (!this.isModuleFilterActive() || !item.yamlPath) {
+      return;
+    }
+
+    const normalizedPath = this.normalizePath(item.path);
+    const pathKey = normalizedPath.toLowerCase();
+    const cachedIconUrl = this.itemIconUrlByPath.get(pathKey);
+    if (cachedIconUrl) {
+      if (item.iconUrl !== cachedIconUrl) {
+        item.iconUrl = cachedIconUrl;
+        this.prefetchIcon(cachedIconUrl);
+        this.scheduleTreeRefresh();
+      }
+      return;
+    }
+
+    if (this.moduleItemIconHydrationInFlight.has(pathKey)) {
+      return;
+    }
+
+    this.moduleItemIconHydrationInFlight.add(pathKey);
+    void (async () => {
+      try {
+        const graphItem = await this.withTiming(
+          'moduleYaml.icon.fetchItemByPath',
+          () => this.client.getItemByPath(normalizedPath),
+          undefined,
+          `path=${normalizedPath}`
+        );
+        const iconUrl = graphItem?.iconUrl || this.client.getDefaultItemIconUrl();
+        if (!iconUrl) {
+          return;
+        }
+
+        this.itemIconUrlByPath.set(pathKey, iconUrl);
+
+        const updated = this.applyIconUrlToModuleItem(pathKey, iconUrl);
+        if (updated || item.iconUrl !== iconUrl) {
+          item.iconUrl = iconUrl;
+          this.prefetchIcon(iconUrl);
+          this.scheduleTreeRefresh();
+        }
+      } catch {
+        // Keep fallback status icon when icon hydration fails.
+      } finally {
+        this.moduleItemIconHydrationInFlight.delete(pathKey);
+      }
+    })();
   }
 
   private async getRawChildren(basePath: string, requestGeneration: number, traceId?: string): Promise<SitecoreItem[]> {
@@ -1302,15 +1393,38 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
   private async findYamlFilesUnderRoots(rootUris: vscode.Uri[], includePattern: string): Promise<vscode.Uri[]> {
     const discovered = new Map<string, vscode.Uri>();
 
-    for (const rootUri of rootUris) {
+    const foundByRoot = await Promise.all(rootUris.map(async rootUri => {
       const pattern = new vscode.RelativePattern(rootUri, includePattern);
-      const found = await vscode.workspace.findFiles(pattern, this.getExcludePattern());
+      return vscode.workspace.findFiles(pattern, this.getExcludePattern());
+    }));
+
+    for (const found of foundByRoot) {
       for (const fileUri of found) {
         discovered.set(this.normalizeFileSystemKey(fileUri.fsPath), fileUri);
       }
     }
 
     return Array.from(discovered.values());
+  }
+
+  private async getCachedOrReadYamlMetadata(yamlUri: vscode.Uri): Promise<CachedYamlMetadata | undefined> {
+    const cacheKey = yamlUri.fsPath.toLowerCase();
+    const cached = this.moduleItemsYamlMetadataCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    let content = '';
+    try {
+      const bytes = await vscode.workspace.fs.readFile(yamlUri);
+      content = Buffer.from(bytes).toString('utf8');
+    } catch {
+      return undefined;
+    }
+
+    const parsed = this.parseYamlMetadata(content);
+    this.moduleItemsYamlMetadataCache.set(cacheKey, parsed);
+    return parsed;
   }
 
   private async loadConfiguredModuleJsonEntries(): Promise<ConfiguredModuleJsonEntry[]> {
@@ -1656,64 +1770,77 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       return;
     }
 
-    const affectedByPath = new Map<string, SitecoreItem>();
+    const yamlUris = await this.withTiming(
+      'moduleYaml.findFiles',
+      () => this.findYamlFilesUnderRoots(moduleRootDirs, '**/*.{yml,yaml}'),
+      traceId,
+      `roots=${moduleRootDirs.length}`
+    );
 
-    for (const rootDir of moduleRootDirs) {
-      if (requestGeneration !== this.loadGeneration) {
-        return;
-      }
+    const collectedItems: SitecoreItem[] = [];
+    const maxConcurrency = Math.min(16, Math.max(1, yamlUris.length));
+    let nextIndex = 0;
 
-      const yamlUris = await this.withTiming(
-        'moduleYaml.findFiles',
-        () => this.findYamlFilesUnderRoots([rootDir], '**/*.{yml,yaml}'),
-        traceId,
-        `root=${rootDir.fsPath}`
-      );
+    await this.withTiming('moduleYaml.processFiles.total', async () => {
+      const workers = Array.from({ length: maxConcurrency }, async () => {
+        while (nextIndex < yamlUris.length) {
+          const localIndex = nextIndex;
+          nextIndex += 1;
+          if (requestGeneration !== this.loadGeneration) {
+            return;
+          }
 
-      for (const yamlUri of yamlUris) {
-        if (requestGeneration !== this.loadGeneration) {
-          return;
-        }
-
-        let content = '';
-        try {
-          const bytes = await this.withTiming(
-            'moduleYaml.readFile',
-            () => vscode.workspace.fs.readFile(yamlUri),
+          const yamlUri = yamlUris[localIndex];
+          const parsed = await this.withTiming(
+            'moduleYaml.readAndParseMetadata',
+            () => this.getCachedOrReadYamlMetadata(yamlUri),
             traceId,
             `file=${yamlUri.fsPath}`
           );
-          content = Buffer.from(bytes).toString('utf8');
-        } catch {
-          continue;
-        }
+          if (!parsed?.path) {
+            continue;
+          }
 
-        const parsed = this.parseYamlMetadata(content);
-        if (!parsed.path || affectedByPath.has(parsed.path)) {
-          continue;
-        }
+          const normalizedPath = this.normalizePath(parsed.path);
+          const match = source ? this.getModulePathMatch(normalizedPath, source.pathConfigs) : undefined;
+          if (!match) {
+            continue;
+          }
 
-        const match = source ? this.getModulePathMatch(parsed.path, source.pathConfigs) : undefined;
-        if (!match) {
-          continue;
-        }
+          const cachedIconUrl = this.itemIconUrlByPath.get(normalizedPath.toLowerCase());
+          const defaultIconUrl = this.client.getDefaultItemIconUrl();
 
-        affectedByPath.set(parsed.path, {
-          id: parsed.path,
-          name: parsed.name || this.deriveNameFromPath(parsed.path),
-          path: parsed.path,
-          hasChildren: false,
-          status: match.status,
-          yamlPath: yamlUri.fsPath,
-          matchedModule: this.selectedModule,
-          moduleDescription: source?.description,
-          moduleJsonPath: source?.jsonUri.fsPath,
-          subtreeKey: match.config.name,
-          subtreePath: match.config.path,
-          subtreeScope: match.config.scope,
-          subtreePushOperations: match.config.allowedPushOperations,
-          subtreeDatabase: match.config.database
-        });
+          collectedItems.push({
+            id: normalizedPath,
+            name: parsed.name || this.deriveNameFromPath(normalizedPath),
+            path: normalizedPath,
+            iconUrl: cachedIconUrl || defaultIconUrl,
+            hasChildren: false,
+            status: match.status,
+            yamlPath: yamlUri.fsPath,
+            matchedModule: this.selectedModule,
+            moduleDescription: source?.description,
+            moduleJsonPath: source?.jsonUri.fsPath,
+            subtreeKey: match.config.name,
+            subtreePath: match.config.path,
+            subtreeScope: match.config.scope,
+            subtreePushOperations: match.config.allowedPushOperations,
+            subtreeDatabase: match.config.database
+          });
+        }
+      });
+
+      await Promise.all(workers);
+    }, traceId, `files=${yamlUris.length}; concurrency=${maxConcurrency}`);
+
+    if (requestGeneration !== this.loadGeneration) {
+      return;
+    }
+
+    const affectedByPath = new Map<string, SitecoreItem>();
+    for (const item of collectedItems.sort((a, b) => a.path.localeCompare(b.path))) {
+      if (!affectedByPath.has(item.path)) {
+        affectedByPath.set(item.path, item);
       }
     }
 
@@ -1907,6 +2034,7 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
     this.reconcileInFlightByPath.clear();
     this.iconDataUriCache.clear();
     this.iconFetchInFlight.clear();
+    this.moduleItemIconHydrationInFlight.clear();
 
     if (options?.resetState) {
       this.loadGeneration += 1;
@@ -1914,6 +2042,7 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       this.client.setDatabase(this.selectedDatabase);
       this.availableModulesCache = undefined;
       this.moduleSerializationSourceCache.clear();
+      this.itemIconUrlByPath.clear();
     }
 
     this._onDidChangeTreeData.fire();

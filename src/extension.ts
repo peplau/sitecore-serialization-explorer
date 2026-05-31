@@ -244,24 +244,14 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 	context.subscriptions.push(disabledItemDecorationProvider);
 
-	const expandVisibleBranch = async (node: SitecoreTreeItem): Promise<void> => {
-		if (!node.item.hasChildren) {
-			return;
-		}
-
-		// Expand first so the tree shows its built-in loading state while children are fetched.
-		await treeView.reveal(node, { expand: true, focus: false, select: false });
-		const children = await treeProvider.getChildren(node);
-
-		for (const child of children) {
-			await expandVisibleBranch(child);
-		}
-	};
-
-	const expandVisibleModuleTree = async (): Promise<void> => {
+	const expandVisibleModuleRoots = async (): Promise<void> => {
 		const roots = await treeProvider.getChildren();
 		for (const root of roots) {
-			await expandVisibleBranch(root);
+			if (!root.item.hasChildren) {
+				continue;
+			}
+
+			await treeView.reveal(root, { expand: true, focus: false, select: false });
 		}
 	};
 
@@ -284,6 +274,9 @@ export function activate(context: vscode.ExtensionContext) {
 	updateModuleStatus();
 	moduleStatus.command = 'sitecore-serialization-explorer.selectModule';
 	moduleStatus.show();
+
+	// Warm module list cache in the background so opening module picker is fast.
+	void treeProvider.getAvailableModules();
 
 	// Register commands
 	const refreshTreeCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.refreshTree', async () => {
@@ -338,13 +331,14 @@ export function activate(context: vscode.ExtensionContext) {
 		treeProvider.setSelectedModule(selection.label);
 		updateModuleStatus();
 		treeProvider.refresh();
+		await vscode.commands.executeCommand('workbench.actions.treeView.sitecoreContentTree.collapseAll');
 
 		if (selection.label === 'All modules') {
-			await vscode.commands.executeCommand('workbench.actions.treeView.sitecoreContentTree.collapseAll');
 			return;
 		}
 
-		await expandVisibleModuleTree();
+		// Do not block command completion while roots are expanded.
+		void expandVisibleModuleRoots();
 	});
 
 	const copyPathCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.copyPath', (item: SitecoreTreeItem) => {
