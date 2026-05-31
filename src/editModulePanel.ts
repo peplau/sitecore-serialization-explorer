@@ -1681,10 +1681,6 @@ button { cursor: pointer; font: inherit; }
   <h2>Includes</h2>
 </div>
 <div class="expand-collapse-buttons">
-  <div class="expand-collapse-left">
-    <button type="button" id="btn-expand-all" class="expand-collapse-btn">Expand All</button>
-    <button type="button" id="btn-collapse-all" class="expand-collapse-btn">Collapse All</button>
-  </div>
   <button type="button" id="btn-add-include" class="expand-collapse-btn">+ Add Include</button>
 </div>
 <div id="includes-container"></div>
@@ -2955,26 +2951,6 @@ button { cursor: pointer; font: inherit; }
           incBlock.classList.toggle('collapsed');
           target.textContent = incBlock.classList.contains('collapsed') ? '▶' : '▼';
         }
-        return;
-      }
-
-      // Expand all includes
-      if (target.id === 'btn-expand-all') {
-        document.querySelectorAll('.include-block.collapsed').forEach(function(block) {
-          block.classList.remove('collapsed');
-          var toggle = block.querySelector('.include-toggle');
-          if (toggle) { toggle.textContent = '▼'; }
-        });
-        return;
-      }
-
-      // Collapse all includes
-      if (target.id === 'btn-collapse-all') {
-        document.querySelectorAll('.include-block:not(.collapsed)').forEach(function(block) {
-          block.classList.add('collapsed');
-          var toggle = block.querySelector('.include-toggle');
-          if (toggle) { toggle.textContent = '▶'; }
-        });
         return;
       }
 

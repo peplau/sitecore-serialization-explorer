@@ -20,7 +20,7 @@ A Visual Studio Code extension that helps Sitecore developers visualize, inspect
 | --- | --- | 
 | ![](assets/20260529_123850_image.png) | ![](assets/20260529_123910_image.png) |
 
-**3) Integrated `explain` analysis.**
+**3) Integrated `Explain` analysis.**
 <img src="assets/20260529_124503_image.png" width="700"/>
 
 **4) Module-level exploration across configured `json` files.**
@@ -74,71 +74,36 @@ Adds a custom view in File Explorer: **Sitecore Serialization Explorer**.
 
 - Items are listed in a content tree in the same way as in Sitecore's Content Editor
 - Refresh reloads the tree from scratch
-- Items can be quickly searched by **Path** or **ID**
+- Items can be quickly searched by **Path** or **ID** - Reveals the item in the tree and opens the Explain Panel for it
 - A list of serialization modules is easily available from here
 
 At the bottom of Visual Studio Code there are two aditional filters:
 
 ![](assets/20260531_201047_image.png)
 
-**Database Filtering**
+**Database Filtering** - Refreshes tree state for the selected database.
 
 ![](assets/20260531_200559_image.png)
 
-**Module Filtering**
+**Module Filtering** - Content is filtered to the selected module scope.
 
 ![](assets/20260531_200903_image.png)
 
-### 2) Serialization Status Visualization
-
-Each tree node is colored by status:
-
-- **Direct (yellow)**: path directly matches a serialization include/rule.
-- **Indirect (orange)**: path is serialized through parent/include scope.
-- **Untracked (gray)**: unresolved or not yet fully evaluated.
-- **Not serialized (dim/disabled gray)**: path not part of effective serialization.
-
-During background reconciliation, unresolved nodes show a pending icon while status finalization runs.
-
-### 3) Fast, Non-Blocking Status Reconciliation
-
-- Tree expansion returns quickly from GraphQL results.
-- Additional reconciliation runs in the background using `dotnet sitecore ser explain` for uncertain statuses.
-- Statuses update in-place as results arrive, avoiding UI stalls on large trees.
-
-### 4) Path and GUID Search
-
-Command: **Search Sitecore Path**
-
-- Accepts either:
-  - A Sitecore path (for example, `/sitecore/content/home`)
-  - A Sitecore item GUID (for example, `{FBFE3DAE-E317-4DCE-97D2-94C806896642}`)
-- Reveals the item in the tree and opens details.
-
-### 5) Database Selector (Status Bar)
-
-- Status bar control: **Sitecore DB: master/core**.
-- Switches GraphQL query database at runtime.
-- Refreshes tree state for the selected database.
-
-### 6) Module Filter Selector (Status Bar)
-
-- Status bar control: **Module: All modules / specific module**.
-- Module list is discovered from configured Sitecore module JSON files.
-- In module-filter mode, tree content is built from module YAML under `items/**/*.{yml,yaml}` and filtered to the selected module scope.
-
-### 7) Explain Panel (Per Item)
+### 2) Explain Panel
 
 Command: **Show Details** (also opens when clicking tree nodes)
+
+![](assets/20260529_124503_image.png)
 
 For each item, the panel shows:
 
 - Item path.
 - Effective serialized/not-serialized status.
 - Module match and module description.
+  - Click "EDIT" opens the module in Edition Mode
+  - Click "VIEW ITEMS" shows a list of items serialized by this module
 - Human-readable explain reasons parsed from CLI output.
 - YAML physical file (when available).
-- Include/rule metadata inferred from explain output and serialization config.
 
 Actions in the panel:
 
