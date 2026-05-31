@@ -297,11 +297,11 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const selectDatabaseCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.selectDatabase', async () => {
-		const current = treeProvider.getSelectedDatabase();
+		const current = treeProvider.getSelectedDatabase().toLowerCase().trim();
 		const selection = await vscode.window.showQuickPick(
 			[
-				{ label: 'master', description: current === 'master' ? 'Current' : '' },
-				{ label: 'core', description: current === 'core' ? 'Current' : '' }
+				{ label: 'master', description: current === 'master' ? 'Current' : '', picked: current === 'master' },
+				{ label: 'core', description: current === 'core' ? 'Current' : '', picked: current === 'core' }
 			],
 			{
 				title: 'Select Sitecore Database',
@@ -309,7 +309,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		);
 
-		if (!selection || selection.label === current) {
+		if (!selection || selection.label.toLowerCase().trim() === current) {
 			return;
 		}
 
@@ -317,6 +317,7 @@ export function activate(context: vscode.ExtensionContext) {
 		updateDatabaseStatus();
 		await vscode.commands.executeCommand('workbench.actions.treeView.sitecoreContentTree.collapseAll');
 		treeProvider.refresh({ resetState: true });
+		void treeProvider.prefetchRootIconAndExpand(treeView);
 	});
 
 	const selectModuleCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.selectModule', async () => {

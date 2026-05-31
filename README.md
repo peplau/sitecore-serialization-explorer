@@ -33,8 +33,8 @@ A Visual Studio Code extension that helps Sitecore developers visualize, inspect
 
 Install the module using one of the options below:
 
-1. Search for "Sitecore Serialization Explorer" and install using Visual Studio Code Extensions
-2. Search for "Sitecore Serialization Explorer" and install using Visual Studio Marketplace [Link Here]
+* Search for "Sitecore Serialization Explorer" and install using Visual Studio Code Extensions
+2. Search for "Sitecore Serialization Explorer" and install using [Visual Studio Marketplace](https://marketplace.visualstudio.com/)
 3. Download and install from the [GitHub Repository](https://github.com/peplau/sitecore-serialization-explorer)
 
 ## Configuration
