@@ -334,6 +334,8 @@ export function activate(context: vscode.ExtensionContext) {
 		await vscode.commands.executeCommand('workbench.actions.treeView.sitecoreContentTree.collapseAll');
 
 		if (selection.label === 'All modules') {
+			// Match refresh behavior by loading the root and its first visible children.
+			void treeProvider.prefetchRootIconAndExpand(treeView);
 			return;
 		}
 
