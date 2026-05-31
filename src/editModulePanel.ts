@@ -1056,6 +1056,11 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
 .include-block {
   margin-bottom: 14px;
 }
+.include-insert-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
 .include-group {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -1270,7 +1275,7 @@ button { cursor: pointer; font: inherit; }
 .expand-collapse-buttons {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-bottom: 12px;
 }
 .expand-collapse-left {
@@ -2307,6 +2312,9 @@ button { cursor: pointer; font: inherit; }
             : '') +
           '</div>' +
         '</div>' +
+        '<div class="include-insert-row">' +
+          '<button type="button" class="btn-secondary-sm btn-add-include-below">+ Add Include</button>' +
+        '</div>' +
       '</div>';
   }
 
@@ -2413,6 +2421,41 @@ button { cursor: pointer; font: inherit; }
     }
 
     container.innerHTML = includesHtml;
+  }
+
+  function createNewIncludeElement() {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = includeHtml(idCounter++, {
+      name: '', path: '', database: '',
+      scope: '', allowedPushOperations: '',
+      maxRelativeDepth: '', rules: []
+    });
+
+    var newInclude = tmp.firstChild;
+    if (newInclude && newInclude.classList && newInclude.classList.contains('collapsed')) {
+      newInclude.classList.remove('collapsed');
+      var toggle = newInclude.querySelector('.include-toggle');
+      if (toggle) { toggle.textContent = '▼'; }
+    }
+
+    return newInclude;
+  }
+
+  function insertIncludeAtPosition(container, newInclude, insertBeforeNode) {
+    if (!container || !newInclude) {
+      return;
+    }
+
+    if (insertBeforeNode) {
+      container.insertBefore(newInclude, insertBeforeNode);
+    } else {
+      container.appendChild(newInclude);
+    }
+
+    scrollElementBelowStickyHeader(newInclude, true);
+    var firstIncludeField = newInclude.querySelector ? newInclude.querySelector('.inc-name') : null;
+    focusAndScroll(firstIncludeField);
+    updateSaveButtonState();
   }
 
   function renderExcludedFields() {
@@ -3062,30 +3105,27 @@ button { cursor: pointer; font: inherit; }
       return;
     }
 
+    if (target.classList.contains('btn-add-include-below')) {
+      var includeContainer = document.getElementById('includes-container');
+      if (!includeContainer) { return; }
+
+      var sourceInclude = target.closest('.include-block');
+      var newIncludeBelow = createNewIncludeElement();
+      if (!newIncludeBelow) { return; }
+
+      var insertBeforeNode = sourceInclude ? sourceInclude.nextSibling : null;
+      insertIncludeAtPosition(includeContainer, newIncludeBelow, insertBeforeNode);
+      return;
+    }
+
     if (target.id === 'btn-add-include') {
       var container = document.getElementById('includes-container');
-      var tmp = document.createElement('div');
-      tmp.innerHTML = includeHtml(idCounter++, {
-        name: '', path: '', database: '',
-        scope: '', allowedPushOperations: '',
-        maxRelativeDepth: '', rules: []
-      });
-      var newInclude = tmp.firstChild;
-      container.appendChild(newInclude);
+      if (!container) { return; }
+      var newInclude = createNewIncludeElement();
+      if (!newInclude) { return; }
 
-      if (newInclude && newInclude.classList && newInclude.classList.contains('collapsed')) {
-        newInclude.classList.remove('collapsed');
-        var toggle = newInclude.querySelector('.include-toggle');
-        if (toggle) { toggle.textContent = '▼'; }
-      }
-
-      if (newInclude) {
-        scrollElementBelowStickyHeader(newInclude, true);
-      }
-
-      var firstIncludeField = newInclude && newInclude.querySelector ? newInclude.querySelector('.inc-name') : null;
-      focusAndScroll(firstIncludeField);
-      updateSaveButtonState();
+      var firstExistingInclude = container.querySelector('.include-block');
+      insertIncludeAtPosition(container, newInclude, firstExistingInclude);
       return;
     }
 

@@ -105,15 +105,7 @@ For each item, the panel shows:
 - Human-readable explain reasons parsed from CLI output.
 - YAML physical file (when available).
 
-Actions in the panel:
-
-- Open YAML file.
-- Open module JSON file.
-- Edit module JSON.
-- Jump to include/rule in module JSON.
-- Open module items listing.
-
-### 8) Modules Listing Panel
+### 3) Modules Listing Panel
 
 Command: **Show all modules**
 
@@ -121,9 +113,16 @@ Command: **Show all modules**
 - Displays module namespace, description, references, and resolved JSON path.
 - Includes actions to open JSON, edit module, and view module items.
 
-### 9) Module Items Listing Panel
+![](assets/20260529_125144_image.png)
+
+* Click "EDIT" opens the module in Edition Mode
+* Click "VIEW ITEMS" shows a list of items serialized by this module
+
+### 4) Module Items Listing Panel
 
 From Explain or Modules panel, **View Items** opens a module items breakdown:
+
+![](assets/20260531_203955_image.png)
 
 - Groups results by:
   - Master database items
@@ -133,12 +132,14 @@ From Explain or Modules panel, **View Items** opens a module items breakdown:
 - For each row, shows path/value, status (direct/indirect), include/rule source, and YAML path.
 - Supports:
   - Open YAML
-  - Copy path/value
-  - Copy item ID (when available)
+  - Copy item path
+  - Copy item ID
 
-### 10) In-Editor Module JSON Editor
+### 5) Module JSON Editor
 
 From Explain/Modules panel, **Edit** opens a rich module editor with save support.
+
+![](assets/20260529_125331_image.png)
 
 Editable areas:
 
