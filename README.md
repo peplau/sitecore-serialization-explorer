@@ -34,6 +34,7 @@ A Visual Studio Code extension that helps Sitecore developers visualize, inspect
 Install the module using one of the options below:
 
 * Search for "Sitecore Serialization Explorer" and install using Visual Studio Code Extensions
+
 2. Search for "Sitecore Serialization Explorer" and install using [Visual Studio Marketplace](https://marketplace.visualstudio.com/)
 3. Download and install from the [GitHub Repository](https://github.com/peplau/sitecore-serialization-explorer)
 
@@ -65,12 +66,28 @@ After that, click on the Refresh button at the Sitecore Serialization Explorer w
 
 ## Features
 
-### 1) Explorer View: Sitecore Content Tree
+### 1) Sitecore Serialization Explorer
 
-- Adds a custom view in Explorer: **Sitecore Serialization Explorer**.
-- Loads children from Authoring GraphQL for the selected Sitecore database.
-- Supports normal expand/collapse behavior and refresh.
-- Displays `/sitecore` as the root node.
+Adds a custom view in File Explorer: **Sitecore Serialization Explorer**.
+
+![](assets/20260531_194122_image.png)
+
+- Items are listed in a content tree in the same way as in Sitecore's Content Editor
+- Refresh reloads the tree from scratch
+- Items can be quickly searched by **Path** or **ID**
+- A list of serialization modules is easily available from here
+
+At the bottom of Visual Studio Code there are two aditional filters:
+
+![](assets/20260531_201047_image.png)
+
+**Database Filtering**
+
+![](assets/20260531_200559_image.png)
+
+**Module Filtering**
+
+![](assets/20260531_200903_image.png)
 
 ### 2) Serialization Status Visualization
 
