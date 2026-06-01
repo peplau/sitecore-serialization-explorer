@@ -7,6 +7,15 @@ A Visual Studio Code extension that helps Sitecore developers visualize, inspect
 * [Configuration](#configuration)
 * [Authentication](#authentication)
 * [Features](#features)
+  1. [Sitecore Serialization Explorer](#1-sitecore-serialization-explorer)
+  2. [Explain Panel](#2-explain-panel)
+  3. [Modules Listing Panel](#3-modules-listing-panel)
+  4. [Module Items Listing Panel](#4-module-items-listing-panel)
+  5. [Module JSON Editor](#5-module-json-editor)
+* [Requirements](#requirements)
+* [Full Configuration](full-configuration)
+* [Known Issues](#known-issues)
+* [Release Notes](#release-notes)
 
 ## Main Features
 
@@ -34,9 +43,10 @@ A Visual Studio Code extension that helps Sitecore developers visualize, inspect
 Install the module using one of the options below:
 
 * Search for "Sitecore Serialization Explorer" and install using Visual Studio Code Extensions
-
-2. Search for "Sitecore Serialization Explorer" and install using [Visual Studio Marketplace](https://marketplace.visualstudio.com/)
-3. Download and install from the [GitHub Repository](https://github.com/peplau/sitecore-serialization-explorer)
+  or
+* Search for "Sitecore Serialization Explorer" and install using [Visual Studio Marketplace](https://marketplace.visualstudio.com/)
+  or
+* Download and install from the [GitHub Repository](https://github.com/peplau/sitecore-serialization-explorer)
 
 ## Configuration
 
@@ -190,7 +200,7 @@ The extension assumes a Sitecore development workspace with serialization assets
 - Resolved module JSON files (`*.module.json`, `*.json`, etc.) containing `items.includes`.
 - Serialized YAML trees under each module root in `items/`.
 
-## Configuration
+## Full Configuration
 
 All options can be set either as a **VS Code setting** (via `settings.json` or the Settings UI) or as a **`.env.local` variable** in the workspace root. VS Code settings take precedence over `.env.local` variables when both are present.
 
@@ -210,6 +220,14 @@ All options can be set either as a **VS Code setting** (via `settings.json` or t
 
 ## Release Notes
 
+### 1.0.2
+
+Fine tuned the README documentation
+
+### 1.0.1
+
+Added an icon to our extension
+
 ### 1.0.0
 
 Initial public version of Sitecore Serialization Explorer with:
@@ -221,4 +239,6 @@ Initial public version of Sitecore Serialization Explorer with:
 - Modules listing and module items breakdown.
 - In-editor module JSON editing experience.
 - Optional performance tracing output.
+
+
 

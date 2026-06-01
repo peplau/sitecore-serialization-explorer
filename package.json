@@ -1,9 +1,10 @@
 {
-  "name": "sitecore-serialization-explorer",
-  "displayName": "Sitecore Serialization Explorer",
+  "name": "sitecore-serialization-xplorer",
+  "displayName": "Sitecore Serialization Explorer (SCS Explorer)",
   "description": "Helps Sitecore Developers visualize how SCS Serialization is configured in a project",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "publisher": "RodrigoPeplau",
+  "icon": "assets/extension-icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/peplau/sitecore-serialization-explorer.git"
