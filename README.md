@@ -13,7 +13,7 @@ A Visual Studio Code extension that helps Sitecore developers visualize, inspect
   4. [Module Items Listing Panel](#4-module-items-listing-panel)
   5. [Module JSON Editor](#5-module-json-editor)
 * [Requirements](#requirements)
-* [Full Configuration](full-configuration)
+* [Full Configuration](#full-configuration)
 * [Known Issues](#known-issues)
 * [Release Notes](#release-notes)
 
@@ -206,12 +206,12 @@ All options can be set either as a **VS Code setting** (via `settings.json` or t
 
 | VS Code Setting | `.env.local` Variable | Default | Description |
 |---|---|---|---|
-| `sitecoreSerializationViewer.authoringGraphqlUrl` | `SITECORE_EDGE_HOSTNAME` | — | Authoring GraphQL endpoint. The VS Code setting accepts a full URL; the env var accepts a hostname or full URL (the API path is appended automatically). The VS Code setting takes precedence. |
-| `sitecoreSerializationViewer.edgeContextId` | `SITECORE_EDGE_CONTEXT_ID` | — | Sitecore Edge context ID sent as the `SC-Edge-Context-Id` request header. |
-| `sitecoreSerializationViewer.endpoint` | `ENDPOINT` | `xmCloud` | Endpoint key inside `.sitecore/user.json → endpoints` from which the `accessToken` is read (for example, `dev` if your CLI login stored the token under a `dev` key). |
-| `sitecoreSerializationViewer.defaultLanguage` | `LANGUAGE` | `en` | Default Sitecore language for GraphQL requests. |
-| `sitecoreSerializationViewer.defaultDatabase` | `DATABASE` | `master` | Default Sitecore database for tree queries. |
-| `sitecoreSerializationViewer.debug` | `DEBUG` | `false` | Set to `true` to enable the performance diagnostics output channel: **Sitecore Serialization Performance**. |
+| `sitecoreSerializationExplorer.authoringGraphqlUrl` | `SITECORE_EDGE_HOSTNAME` | — | Authoring GraphQL endpoint. The VS Code setting accepts a full URL; the env var accepts a hostname or full URL (the API path is appended automatically). The VS Code setting takes precedence. |
+| `sitecoreSerializationExplorer.edgeContextId` | `SITECORE_EDGE_CONTEXT_ID` | — | Sitecore Edge context ID sent as the `SC-Edge-Context-Id` request header. |
+| `sitecoreSerializationExplorer.endpoint` | `ENDPOINT` | `xmCloud` | Endpoint key inside `.sitecore/user.json → endpoints` from which the `accessToken` is read (for example, `dev` if your CLI login stored the token under a `dev` key). |
+| `sitecoreSerializationExplorer.defaultLanguage` | `LANGUAGE` | `en` | Default Sitecore language for GraphQL requests. |
+| `sitecoreSerializationExplorer.defaultDatabase` | `DATABASE` | `master` | Default Sitecore database for tree queries. |
+| `sitecoreSerializationExplorer.debug` | `DEBUG` | `false` | Set to `true` to enable the performance diagnostics output channel: **Sitecore Serialization Performance**. |
 
 ## Known Issues
 
