@@ -826,7 +826,7 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       path: '/sitecore/content',
       hasChildren: true,
       status: SerializationStatus.Direct,
-      matchedModule: '_Vizient.Main',
+      matchedModule: '_Client.Main',
       pushOperations: 'CreateUpdateAndDelete'
     },
     {
@@ -835,7 +835,7 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       path: '/sitecore/templates',
       hasChildren: true,
       status: SerializationStatus.Indirect,
-      matchedModule: '_Vizient.Main'
+      matchedModule: '_Client.Main'
     },
     {
       id: '4',

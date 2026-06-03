@@ -1665,7 +1665,7 @@ button { cursor: pointer; font: inherit; }
   <div class="fields-grid">
     <div class="field span-2">
       <label for="namespace">Namespace<span class="req">*</span></label>
-      <input id="namespace" type="text" value="${this.esc(this.rawJson.namespace ?? '')}" required placeholder="e.g. Vizient.Heroes">
+      <input id="namespace" type="text" value="${this.esc(this.rawJson.namespace ?? '')}" required placeholder="e.g. Client.Heroes">
     </div>
     <div class="field span-2">
       <label for="description">Description</label>

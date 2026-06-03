@@ -11,32 +11,32 @@ suite('Extension Test Suite', () => {
 
 	test('infers include from serialized yaml path', () => {
 		const service = SerializationConfigService.getInstance();
-		const includeName = service.inferIncludeFromYamlPath('D:/Git/Vizient/dxp-sitecoreai/serialization/_vizient.main/items/Content.Site.Vizient/vizient-website/Settings/Site Grouping/vizient-website.yml');
+		const includeName = service.inferIncludeFromYamlPath('D:/Git/Client/dxp-sitecoreai/serialization/_Client.main/items/Content.Site.Client/Client-website/Settings/Site Grouping/Client-website.yml');
 
-		assert.strictEqual(includeName, 'Content.Site.Vizient');
+		assert.strictEqual(includeName, 'Content.Site.Client');
 	});
 
 	test('infers include from nested items directories', () => {
 		const service = SerializationConfigService.getInstance();
-		const includeName = service.inferIncludeFromYamlPath('D:/Git/Vizient/dxp-sitecoreai/authoring/items/nextjs-starter/items/Feature.Navigation/site/home.yml');
+		const includeName = service.inferIncludeFromYamlPath('D:/Git/Client/dxp-sitecoreai/authoring/items/nextjs-starter/items/Feature.Navigation/site/home.yml');
 
 		assert.strictEqual(includeName, 'Feature.Navigation');
 	});
 
 	test('returns undefined when yaml path has no items segment', () => {
 		const service = SerializationConfigService.getInstance();
-		const includeName = service.inferIncludeFromYamlPath('D:/Git/Vizient/dxp-sitecoreai/authoring/items/nextjs-starter/DefaultRenderingHost/Default.yml');
+		const includeName = service.inferIncludeFromYamlPath('D:/Git/Client/dxp-sitecoreai/authoring/items/nextjs-starter/DefaultRenderingHost/Default.yml');
 
 		assert.strictEqual(includeName, undefined);
 	});
 
 	test('resolves include details case-insensitively', () => {
 		const service = SerializationConfigService.getInstance();
-		const includeInfo = service.getIncludeInfo('_vizient.main', 'content.site.vizient');
+		const includeInfo = service.getIncludeInfo('_Client.main', 'content.site.Client');
 
 		assert.ok(includeInfo);
-		assert.strictEqual(includeInfo?.include, 'Content.Site.Vizient');
-		assert.strictEqual(includeInfo?.path, '/sitecore/content/vizient/vizient-website');
+		assert.strictEqual(includeInfo?.include, 'Content.Site.Client');
+		assert.strictEqual(includeInfo?.path, '/sitecore/content/Client/Client-website');
 		assert.strictEqual(includeInfo?.scope, 'ItemAndChildren');
 		assert.strictEqual(includeInfo?.pushOperations, 'CreateAndUpdate');
 		assert.strictEqual(includeInfo?.database, 'master');
