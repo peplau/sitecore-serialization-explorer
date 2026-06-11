@@ -166,9 +166,11 @@ interface IncludeTreeNodeWithChildrenDto extends IncludeTreeNodeDto {
 type WebviewMessage = { command: string; data?: ModuleSaveData } | IncludeTreeLoadMessage | IncludeTreeChildrenMessage | ShowDetailsMessage | OpenJsonMessage;
 
 export class EditModulePanel {
+  private static readonly NEW_MODULE_PANEL_KEY = '__new_module__';
   private static readonly panels: Map<string, EditModulePanel> = new Map();
   private readonly panel: vscode.WebviewPanel;
-  private readonly jsonFileUri: vscode.Uri;
+  private jsonFileUri: vscode.Uri | undefined;
+  private panelKey: string;
   private readonly graphqlClient = new AuthoringGraphqlClient();
   private readonly includeScopeByIncludeId: Map<string, IncludeSerializationScope> = new Map();
   private readonly includeScopeCache: Map<string, Promise<IncludeSerializationScope>> = new Map();
@@ -176,9 +178,11 @@ export class EditModulePanel {
   private pendingRevealSection: EditModuleRevealSection | undefined;
   private pendingRevealIncludeName: string | undefined;
   private pendingRevealRulePath: string | undefined;
+  private focusNamespaceOnRender = false;
 
-  private constructor(panel: vscode.WebviewPanel, jsonFileUri: vscode.Uri) {
+  private constructor(panel: vscode.WebviewPanel, panelKey: string, jsonFileUri?: vscode.Uri) {
     this.panel = panel;
+    this.panelKey = panelKey;
     this.jsonFileUri = jsonFileUri;
 
     this.panel.webview.onDidReceiveMessage(async (message: WebviewMessage) => {
@@ -209,7 +213,7 @@ export class EditModulePanel {
     });
 
     this.panel.onDidDispose(() => {
-      EditModulePanel.panels.delete(this.jsonFileUri.fsPath.toLowerCase());
+      EditModulePanel.panels.delete(this.panelKey);
     });
   }
 
@@ -267,6 +271,11 @@ export class EditModulePanel {
   }
 
   private async handleOpenJson(message: OpenJsonMessage): Promise<void> {
+    if (!this.jsonFileUri) {
+      vscode.window.showWarningMessage('Select a target JSON file first by saving this new module.');
+      return;
+    }
+
     try {
       const doc = await vscode.workspace.openTextDocument(this.jsonFileUri);
       const editor = await vscode.window.showTextDocument(doc, {
@@ -309,7 +318,7 @@ export class EditModulePanel {
       { enableScripts: true, retainContextWhenHidden: true }
     );
 
-    const instance = new EditModulePanel(panel, jsonFileUri);
+    const instance = new EditModulePanel(panel, key, jsonFileUri);
     instance.pendingRevealSection = options?.section;
     instance.pendingRevealIncludeName = options?.includeName;
     instance.pendingRevealRulePath = options?.rulePath;
@@ -317,36 +326,54 @@ export class EditModulePanel {
     await instance.loadAndRender();
   }
 
-  private async loadAndRender(): Promise<void> {
-    try {
-      const bytes = await vscode.workspace.fs.readFile(this.jsonFileUri);
-      this.rawJson = JSON.parse(Buffer.from(bytes).toString('utf8')) as ModuleFileJson;
-    } catch {
-      this.rawJson = { namespace: '' };
+  public static async createNewModule(): Promise<void> {
+    const existing = EditModulePanel.panels.get(EditModulePanel.NEW_MODULE_PANEL_KEY);
+    if (existing) {
+      existing.panel.reveal(vscode.ViewColumn.Active);
+      existing.resetToNewModuleState();
+      return;
     }
-    this.panel.title = 'Edit: ' + (this.rawJson.namespace ?? 'Module');
+
+    const activeColumn = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
+    const panel = vscode.window.createWebviewPanel(
+      'sitecoreEditModule',
+      'Edit Module',
+      activeColumn,
+      { enableScripts: true, retainContextWhenHidden: true }
+    );
+
+    const instance = new EditModulePanel(panel, EditModulePanel.NEW_MODULE_PANEL_KEY);
+    instance.focusNamespaceOnRender = true;
+    EditModulePanel.panels.set(EditModulePanel.NEW_MODULE_PANEL_KEY, instance);
+    await instance.loadAndRender();
+  }
+
+  private resetToNewModuleState(): void {
+    this.jsonFileUri = undefined;
+    this.updatePanelKey(EditModulePanel.NEW_MODULE_PANEL_KEY);
+    this.rawJson = {
+      namespace: '',
+      description: '',
+      items: {
+        includes: []
+      }
+    };
+    this.focusNamespaceOnRender = true;
+    this.panel.title = 'Edit: Module';
     this.panel.webview.html = this.buildHtml();
   }
 
-  private mapIncludesForWebview(includes: IncludeJson[]): IncludeWebviewData[] {
-    return includes.map(inc => ({
-      isSaved: true,
-      name: inc.name ?? '',
-      path: inc.path ?? '',
-      database: inc.database ?? '',
-      scope: inc.scope ?? '',
-      allowedPushOperations: inc.allowedPushOperations ?? '',
-      maxRelativeDepth: typeof inc.maxRelativeDepth === 'number' ? inc.maxRelativeDepth : '',
-      rules: (inc.rules ?? []).map(rule => ({
-        path: rule.path ?? '',
-        scope: rule.scope ?? '',
-        alias: rule.alias ?? '',
-        allowedPushOperations: rule.allowedPushOperations ?? '__inherited__'
-      }))
-    }));
+  private updatePanelKey(nextKey: string): void {
+    if (this.panelKey === nextKey) {
+      return;
+    }
+
+    EditModulePanel.panels.delete(this.panelKey);
+    this.panelKey = nextKey;
+    EditModulePanel.panels.set(this.panelKey, this);
   }
 
-  private async saveModule(data: ModuleSaveData): Promise<void> {
+  private buildModuleJsonFromData(data: ModuleSaveData): ModuleFileJson {
     const existingIncludes = Array.isArray(this.rawJson.items?.includes) ? this.rawJson.items?.includes ?? [] : [];
     const existingExcludedFields = Array.isArray(this.rawJson.items?.excludedFields) ? this.rawJson.items.excludedFields : [];
     const existingRoles = Array.isArray(this.rawJson.roles) ? this.rawJson.roles : [];
@@ -410,7 +437,6 @@ export class EditModulePanel {
         delete existingInclude.rules;
       }
 
-      // Ensure excluded fields are persisted only at items.excludedFields (top-level sibling of includes).
       delete existingInclude.excludedFields;
 
       return existingInclude;
@@ -488,6 +514,109 @@ export class EditModulePanel {
       merged = { ...merged, users: nextUsers };
     }
 
+    return merged;
+  }
+
+  private async initializeNewModuleJsonFile(data: ModuleSaveData): Promise<boolean> {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+    const moduleFileName = `${data.namespace.trim() || 'new.module'}.json`;
+    const defaultUri = workspaceRoot
+      ? vscode.Uri.joinPath(workspaceRoot, moduleFileName)
+      : undefined;
+
+    const selectedUri = await vscode.window.showSaveDialog({
+      title: 'Create Serialization Module JSON',
+      saveLabel: 'Create Module JSON',
+      defaultUri,
+      filters: {
+        'JSON files': ['json']
+      }
+    });
+
+    if (!selectedUri) {
+      return false;
+    }
+
+    const moduleJson = this.buildModuleJsonFromData(data);
+
+    try {
+      await vscode.workspace.fs.writeFile(
+        selectedUri,
+        Buffer.from(JSON.stringify(moduleJson, null, 2), 'utf8')
+      );
+    } catch (err) {
+      vscode.window.showErrorMessage('Failed to create module JSON file: ' + (err instanceof Error ? err.message : String(err)));
+      return false;
+    }
+
+    this.jsonFileUri = selectedUri;
+    this.updatePanelKey(selectedUri.fsPath.toLowerCase());
+    this.rawJson = moduleJson;
+    this.panel.title = 'Edit: ' + (moduleJson.namespace ?? 'Module');
+    this.panel.webview.html = this.buildHtml();
+    await vscode.commands.executeCommand('sitecore-serialization-explorer.refreshModuleDiscovery');
+    vscode.window.showInformationMessage('Module "' + (moduleJson.namespace ?? '') + '" created at: ' + selectedUri.fsPath);
+    return true;
+  }
+
+  private async loadAndRender(): Promise<void> {
+    if (!this.jsonFileUri) {
+      this.rawJson = {
+        namespace: '',
+        description: '',
+        items: {
+          includes: []
+        }
+      };
+    } else {
+      try {
+        const bytes = await vscode.workspace.fs.readFile(this.jsonFileUri);
+        this.rawJson = JSON.parse(Buffer.from(bytes).toString('utf8')) as ModuleFileJson;
+      } catch {
+        this.rawJson = {
+          namespace: '',
+          description: '',
+          items: {
+            includes: []
+          }
+        };
+      }
+    }
+    this.panel.title = 'Edit: ' + (this.rawJson.namespace ?? 'Module');
+    this.panel.webview.html = this.buildHtml();
+  }
+
+  private mapIncludesForWebview(includes: IncludeJson[]): IncludeWebviewData[] {
+    return includes.map(inc => ({
+      isSaved: true,
+      name: inc.name ?? '',
+      path: inc.path ?? '',
+      database: inc.database ?? '',
+      scope: inc.scope ?? '',
+      allowedPushOperations: inc.allowedPushOperations ?? '',
+      maxRelativeDepth: typeof inc.maxRelativeDepth === 'number' ? inc.maxRelativeDepth : '',
+      rules: (inc.rules ?? []).map(rule => ({
+        path: rule.path ?? '',
+        scope: rule.scope ?? '',
+        alias: rule.alias ?? '',
+        allowedPushOperations: rule.allowedPushOperations ?? '__inherited__'
+      }))
+    }));
+  }
+
+  private async saveModule(data: ModuleSaveData): Promise<void> {
+    if (!this.jsonFileUri) {
+      const initialized = await this.initializeNewModuleJsonFile(data);
+      if (!initialized) {
+        return;
+      }
+
+      return;
+    }
+
+    const merged = this.buildModuleJsonFromData(data);
+    const mergedIncludes = Array.isArray(merged.items?.includes) ? merged.items.includes : [];
+
     try {
       await vscode.workspace.fs.writeFile(
         this.jsonFileUri,
@@ -497,7 +626,7 @@ export class EditModulePanel {
       this.panel.title = 'Edit: ' + (merged.namespace ?? 'Module');
       this.panel.webview.postMessage({
         command: 'saved',
-        includes: this.mapIncludesForWebview(nextIncludes)
+        includes: this.mapIncludesForWebview(mergedIncludes)
       });
       vscode.window.showInformationMessage('Module "' + (merged.namespace ?? '') + '" saved.');
     } catch (err) {
@@ -622,6 +751,13 @@ export class EditModulePanel {
     const normalizedIncludeName = (includeName || '').trim();
     if (!normalizedIncludeName) {
       return { includeName: '', directPaths: new Set<string>() };
+    }
+
+    if (!this.jsonFileUri) {
+      return {
+        includeName: normalizedIncludeName,
+        directPaths: new Set<string>()
+      };
     }
 
     const moduleDirectory = path.dirname(this.jsonFileUri.fsPath);
@@ -931,9 +1067,12 @@ export class EditModulePanel {
   }
 
   private buildHtml(): string {
+    const shouldAutoFocusNamespace = this.focusNamespaceOnRender || !(this.rawJson.namespace ?? '').trim();
+    this.focusNamespaceOnRender = false;
     const initialRevealSectionJson = JSON.stringify(this.pendingRevealSection ?? '');
     const initialRevealIncludeNameJson = JSON.stringify(this.pendingRevealIncludeName ?? '');
     const initialRevealRulePathJson = JSON.stringify(this.pendingRevealRulePath ?? '');
+    const shouldAutoFocusNamespaceJson = JSON.stringify(shouldAutoFocusNamespace);
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1721,6 +1860,7 @@ button { cursor: pointer; font: inherit; }
   const initialRevealSection = ${initialRevealSectionJson};
   const initialRevealIncludeName = ${initialRevealIncludeNameJson};
   const initialRevealRulePath = ${initialRevealRulePathJson};
+  const shouldAutoFocusNamespace = ${shouldAutoFocusNamespaceJson};
   const data = JSON.parse(document.getElementById('initial-data').textContent);
   data.references = Array.isArray(data.references) ? data.references : [];
   data.roles = Array.isArray(data.roles) ? data.roles : [];
@@ -2782,6 +2922,26 @@ button { cursor: pointer; font: inherit; }
   renderRoles();
   renderUsers();
   captureSavedFormState();
+
+  if (shouldAutoFocusNamespace) {
+    setTimeout(function() {
+      var namespaceInput = document.getElementById('namespace');
+      if (!namespaceInput) {
+        return;
+      }
+
+      try {
+        namespaceInput.focus({ preventScroll: true });
+      } catch {
+        namespaceInput.focus();
+      }
+
+      if (typeof namespaceInput.select === 'function') {
+        namespaceInput.select();
+      }
+      scrollElementBelowStickyHeader(namespaceInput, true);
+    }, 0);
+  }
 
   if (initialRevealRulePath) {
     setTimeout(function() {

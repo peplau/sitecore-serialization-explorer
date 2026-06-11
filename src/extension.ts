@@ -275,8 +275,91 @@ export function activate(context: vscode.ExtensionContext) {
 	moduleStatus.command = 'sitecore-serialization-explorer.selectModule';
 	moduleStatus.show();
 
-	// Warm module list cache in the background so opening module picker is fast.
-	void treeProvider.getAvailableModules();
+	let knownModuleJsonPaths = new Set<string>();
+
+	const setKnownModuleJsonPaths = (modules: Array<{ jsonFilePath: string }>) => {
+		knownModuleJsonPaths = new Set(modules.map(module => module.jsonFilePath.toLowerCase()));
+	};
+
+	const refreshModuleDiscoveryViews = async () => {
+		treeProvider.invalidateModuleDiscoveryCache();
+		const modules = await treeProvider.getModuleListingItems();
+		setKnownModuleJsonPaths(modules);
+		const availableModules = modules.map(module => module.namespace);
+
+		if (ModulesPanel.currentPanel) {
+			ModulesPanel.currentPanel.update(modules);
+		}
+
+		const selectedModule = treeProvider.getSelectedModule();
+		if (selectedModule !== 'All modules' && !availableModules.some(module => module.toLowerCase() === selectedModule.toLowerCase())) {
+			treeProvider.setSelectedModule('All modules');
+			updateModuleStatus();
+			treeProvider.refresh({ resetState: true });
+			void treeProvider.prefetchRootIconAndExpand(treeView);
+		}
+	};
+
+	const refreshModuleDiscoveryCommand = vscode.commands.registerCommand(
+		'sitecore-serialization-explorer.refreshModuleDiscovery',
+		async () => {
+			await refreshModuleDiscoveryViews();
+		}
+	);
+
+	const handlePotentialModuleFileChange = async (
+		uri: vscode.Uri,
+		eventType: 'create' | 'change' | 'delete'
+	): Promise<void> => {
+		if (!uri.fsPath.toLowerCase().endsWith('.json')) {
+			return;
+		}
+
+		const filePathKey = uri.fsPath.toLowerCase();
+		const wasKnownModule = knownModuleJsonPaths.has(filePathKey);
+
+		if (eventType === 'delete') {
+			if (wasKnownModule) {
+				await refreshModuleDiscoveryViews();
+			}
+			return;
+		}
+
+		const isSerializationModule = await treeProvider.isSerializationModuleJsonFile(uri);
+		if (wasKnownModule !== isSerializationModule) {
+			await refreshModuleDiscoveryViews();
+			return;
+		}
+
+		if (eventType === 'create' && isSerializationModule) {
+			await refreshModuleDiscoveryViews();
+			return;
+		}
+	};
+
+	const moduleJsonWatcher = vscode.workspace.createFileSystemWatcher('**/*.json', false, false, false);
+	moduleJsonWatcher.onDidCreate(async uri => {
+		await handlePotentialModuleFileChange(uri, 'create');
+	});
+	moduleJsonWatcher.onDidChange(async uri => {
+		await handlePotentialModuleFileChange(uri, 'change');
+	});
+	moduleJsonWatcher.onDidDelete(async uri => {
+		await handlePotentialModuleFileChange(uri, 'delete');
+	});
+	context.subscriptions.push(moduleJsonWatcher);
+
+	const moduleDiscoveryFocusScan = vscode.window.onDidChangeWindowState(state => {
+		if (!state.focused) {
+			return;
+		}
+
+		void refreshModuleDiscoveryViews();
+	});
+	context.subscriptions.push(moduleDiscoveryFocusScan);
+
+	// Initialize known module files from disk once during activation.
+	void refreshModuleDiscoveryViews();
 
 	// Register commands
 	const refreshTreeCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.refreshTree', async () => {
@@ -314,6 +397,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const selectModuleCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.selectModule', async () => {
+		await refreshModuleDiscoveryViews();
 		const current = treeProvider.getSelectedModule();
 		const moduleOptions = ['All modules', ...(await treeProvider.getAvailableModules())];
 		const selection = await vscode.window.showQuickPick(
@@ -377,6 +461,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const showAllModulesCommand = vscode.commands.registerCommand('sitecore-serialization-explorer.showAllModules', async () => {
+		treeProvider.invalidateModuleDiscoveryCache();
 		const panel = ModulesPanel.createOrShow(async (jsonFilePath: string) => {
 			const itemsPanel = ModuleItemsPanel.createOrShowLoading(jsonFilePath);
 			const moduleItems = await treeProvider.getModuleItemsListingByJsonPath(jsonFilePath);
@@ -492,6 +577,7 @@ export function activate(context: vscode.ExtensionContext) {
 		copyPathCommand,
 		showDetailsCommand,
 		showAllModulesCommand,
+		refreshModuleDiscoveryCommand,
 		openModuleInEditUiCommand
 	);
 }

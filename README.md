@@ -220,6 +220,11 @@ All options can be set either as a **VS Code setting** (via `settings.json` or t
 
 ## Release Notes
 
+### 1.0.3
+
+- New modules can now be added via UI at the Modules List
+- When a new module is created, either via UI or downloaded from source control, all lists that depends on modules are updated automatically (Modules Listing Page, Modules Dropdown)
+
 ### 1.0.2
 
 Fine tuned the README documentation

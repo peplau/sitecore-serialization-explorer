@@ -25,6 +25,9 @@ export class ModulesPanel {
       if (message.command === 'viewItems' && typeof message.jsonFilePath === 'string') {
         await this.onViewItems(message.jsonFilePath);
       }
+      if (message.command === 'createModule') {
+        await EditModulePanel.createNewModule();
+      }
     });
   }
 
@@ -97,9 +100,33 @@ h1 {
   max-width: 960px;
   margin-bottom: 20px;
 }
+.intro-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
 .intro p {
   margin: 0;
   color: var(--muted);
+}
+.new-module-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card-bg) 78%, black 22%);
+  color: var(--vscode-button-foreground);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.new-module-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
 }
 .grid {
   display: grid;
@@ -209,10 +236,16 @@ h1 {
 </head>
 <body>
   <section class="intro">
-    <h1>Modules Listing</h1>
+    <div class="intro-header">
+      <h1>Modules Listing</h1>
+      <button type="button" class="new-module-btn" id="create-module-top">+ New Module</button>
+    </div>
     <p>Built from the active <strong>sitecore.json</strong> module globs and the resolved <strong>*.module.json</strong> files.</p>
   </section>
   ${modulesHtml}
+  <section class="new-module-footer">
+    <button type="button" class="new-module-btn" id="create-module-bottom">+ New Module</button>
+  </section>
   <script>
     const vscode = acquireVsCodeApi();
     document.querySelectorAll('.open-json-path').forEach(link => {
@@ -245,6 +278,18 @@ h1 {
         if (jsonFilePath) { vscode.postMessage({ command: 'viewItems', jsonFilePath }); }
       });
     });
+    const createModuleTop = document.getElementById('create-module-top');
+    if (createModuleTop) {
+      createModuleTop.addEventListener('click', () => {
+        vscode.postMessage({ command: 'createModule' });
+      });
+    }
+    const createModuleBottom = document.getElementById('create-module-bottom');
+    if (createModuleBottom) {
+      createModuleBottom.addEventListener('click', () => {
+        vscode.postMessage({ command: 'createModule' });
+      });
+    }
   </script>
 </body>
 </html>`;

@@ -250,6 +250,19 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       .sort((a, b) => a.namespace.localeCompare(b.namespace));
   }
 
+  invalidateModuleDiscoveryCache(): void {
+    this.availableModulesCache = undefined;
+    this.moduleSerializationSourceCache.clear();
+  }
+
+  async isSerializationModuleJsonFile(uri: vscode.Uri): Promise<boolean> {
+    const payload = await this.readJsonFile<{
+      namespace?: unknown;
+    }>(uri);
+
+    return Boolean(payload && typeof payload.namespace === 'string' && payload.namespace.trim().length > 0);
+  }
+
   async getModuleItemsListingByJsonPath(jsonFilePath: string): Promise<ModuleItemsListingData | undefined> {
     const traceId = this.nextModuleItemsTraceId(jsonFilePath);
     appendPerfLine(`[${traceId}] items.request jsonPath=${jsonFilePath}; selectedDatabase=${this.selectedDatabase}`);
@@ -309,8 +322,8 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       ? moduleJson.items.includes.filter(include => typeof include?.path === 'string' && include.path.trim().length > 0)
       : [];
     const moduleName = moduleJson.namespace?.trim();
-    if (!moduleName || includes.length === 0) {
-      appendPerfLine(`[${traceId}] items.result noIncludesOrModule json=${jsonUri.fsPath}`);
+    if (!moduleName) {
+      appendPerfLine(`[${traceId}] items.result noModuleNamespace json=${jsonUri.fsPath}`);
       return undefined;
     }
 
@@ -1552,7 +1565,7 @@ export class ContentTreeProvider implements vscode.TreeDataProvider<SitecoreTree
       const moduleName = json?.namespace?.trim();
       const references = this.normalizeReferences(json?.references);
       const includes = Array.isArray(json?.items?.includes) ? json.items.includes.filter(include => typeof include?.path === 'string' && include.path.trim().length > 0) : [];
-      if (!moduleName || includes.length === 0) {
+      if (!moduleName) {
         continue;
       }
 
