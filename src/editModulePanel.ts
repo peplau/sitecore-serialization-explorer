@@ -140,6 +140,12 @@ interface OpenJsonMessage {
   includeName?: string;
 }
 
+interface DraftStateMessage {
+  command: 'updateDraftState';
+  data: ModuleSaveData;
+  hasUnsavedChanges: boolean;
+}
+
 type EditModuleRevealSection = 'module' | 'includes' | 'excludedFields' | 'roles' | 'users';
 
 interface EditModuleRevealOptions {
@@ -163,7 +169,7 @@ interface IncludeTreeNodeWithChildrenDto extends IncludeTreeNodeDto {
   children: IncludeTreeNodeWithChildrenDto[];
 }
 
-type WebviewMessage = { command: string; data?: ModuleSaveData } | IncludeTreeLoadMessage | IncludeTreeChildrenMessage | ShowDetailsMessage | OpenJsonMessage;
+type WebviewMessage = { command: string; data?: ModuleSaveData } | IncludeTreeLoadMessage | IncludeTreeChildrenMessage | ShowDetailsMessage | OpenJsonMessage | DraftStateMessage;
 
 export class EditModulePanel {
   private static readonly NEW_MODULE_PANEL_KEY = '__new_module__';
@@ -179,6 +185,8 @@ export class EditModulePanel {
   private pendingRevealIncludeName: string | undefined;
   private pendingRevealRulePath: string | undefined;
   private focusNamespaceOnRender = false;
+  private draftData: ModuleSaveData | undefined;
+  private hasUnsavedChanges = false;
 
   private constructor(panel: vscode.WebviewPanel, panelKey: string, jsonFileUri?: vscode.Uri) {
     this.panel = panel;
@@ -210,10 +218,19 @@ export class EditModulePanel {
         await this.handleLoadIncludeTreeChildren(message);
         return;
       }
+
+      if (this.isDraftStateMessage(message)) {
+        this.draftData = message.data;
+        this.hasUnsavedChanges = message.hasUnsavedChanges;
+        return;
+      }
     });
 
     this.panel.onDidDispose(() => {
       EditModulePanel.panels.delete(this.panelKey);
+      if (this.hasUnsavedChanges && this.draftData) {
+        void this.promptToRestoreDraft();
+      }
     });
   }
 
@@ -236,6 +253,39 @@ export class EditModulePanel {
 
   private isOpenJsonMessage(message: WebviewMessage): message is OpenJsonMessage {
     return message.command === 'openJson' && 'target' in message && typeof message.target === 'string';
+  }
+
+  private isDraftStateMessage(message: WebviewMessage): message is DraftStateMessage {
+    return message.command === 'updateDraftState'
+      && 'data' in message
+      && typeof message.data === 'object'
+      && message.data !== null
+      && 'hasUnsavedChanges' in message
+      && typeof message.hasUnsavedChanges === 'boolean';
+  }
+
+  private async promptToRestoreDraft(): Promise<void> {
+    if (!this.draftData) {
+      return;
+    }
+
+    const draftData = this.draftData;
+    const reopenSelection = await vscode.window.showWarningMessage(
+      'The Edit Module window was closed with unsaved changes. Reopen and continue editing?',
+      { modal: true },
+      'Reopen'
+    );
+
+    if (reopenSelection !== 'Reopen') {
+      return;
+    }
+
+    if (this.jsonFileUri) {
+      await EditModulePanel.createOrShow(this.jsonFileUri.fsPath, undefined, draftData);
+      return;
+    }
+
+    await EditModulePanel.createNewModule(draftData);
   }
 
   private buildFallbackItem(pathValue: string): SitecoreItem {
@@ -292,10 +342,15 @@ export class EditModulePanel {
     }
   }
 
-  public static async createOrShow(jsonFilePath: string, options?: EditModuleRevealOptions): Promise<void> {
+  public static async createOrShow(jsonFilePath: string, options?: EditModuleRevealOptions, draftData?: ModuleSaveData): Promise<void> {
     const key = jsonFilePath.toLowerCase();
     const existing = EditModulePanel.panels.get(key);
     if (existing) {
+      if (draftData) {
+        existing.draftData = draftData;
+        existing.hasUnsavedChanges = true;
+        await existing.loadAndRender();
+      }
       existing.panel.reveal(vscode.ViewColumn.Active);
       if (options?.section || options?.includeName || options?.rulePath) {
         existing.panel.webview.postMessage({
@@ -319,6 +374,10 @@ export class EditModulePanel {
     );
 
     const instance = new EditModulePanel(panel, key, jsonFileUri);
+    if (draftData) {
+      instance.draftData = draftData;
+      instance.hasUnsavedChanges = true;
+    }
     instance.pendingRevealSection = options?.section;
     instance.pendingRevealIncludeName = options?.includeName;
     instance.pendingRevealRulePath = options?.rulePath;
@@ -326,9 +385,17 @@ export class EditModulePanel {
     await instance.loadAndRender();
   }
 
-  public static async createNewModule(): Promise<void> {
+  public static async createNewModule(draftData?: ModuleSaveData): Promise<void> {
     const existing = EditModulePanel.panels.get(EditModulePanel.NEW_MODULE_PANEL_KEY);
     if (existing) {
+      if (draftData) {
+        existing.draftData = draftData;
+        existing.hasUnsavedChanges = true;
+        existing.focusNamespaceOnRender = true;
+        await existing.loadAndRender();
+        existing.panel.reveal(vscode.ViewColumn.Active);
+        return;
+      }
       existing.panel.reveal(vscode.ViewColumn.Active);
       existing.resetToNewModuleState();
       return;
@@ -343,6 +410,10 @@ export class EditModulePanel {
     );
 
     const instance = new EditModulePanel(panel, EditModulePanel.NEW_MODULE_PANEL_KEY);
+    if (draftData) {
+      instance.draftData = draftData;
+      instance.hasUnsavedChanges = true;
+    }
     instance.focusNamespaceOnRender = true;
     EditModulePanel.panels.set(EditModulePanel.NEW_MODULE_PANEL_KEY, instance);
     await instance.loadAndRender();
@@ -351,6 +422,8 @@ export class EditModulePanel {
   private resetToNewModuleState(): void {
     this.jsonFileUri = undefined;
     this.updatePanelKey(EditModulePanel.NEW_MODULE_PANEL_KEY);
+    this.draftData = undefined;
+    this.hasUnsavedChanges = false;
     this.rawJson = {
       namespace: '',
       description: '',
@@ -552,6 +625,8 @@ export class EditModulePanel {
     this.jsonFileUri = selectedUri;
     this.updatePanelKey(selectedUri.fsPath.toLowerCase());
     this.rawJson = moduleJson;
+    this.draftData = undefined;
+    this.hasUnsavedChanges = false;
     this.panel.title = 'Edit: ' + (moduleJson.namespace ?? 'Module');
     this.panel.webview.html = this.buildHtml();
     await vscode.commands.executeCommand('sitecore-serialization-explorer.refreshModuleDiscovery');
@@ -623,6 +698,8 @@ export class EditModulePanel {
         Buffer.from(JSON.stringify(merged, null, 2), 'utf8')
       );
       this.rawJson = merged;
+      this.draftData = undefined;
+      this.hasUnsavedChanges = false;
       this.panel.title = 'Edit: ' + (merged.namespace ?? 'Module');
       this.panel.webview.postMessage({
         command: 'saved',
@@ -1019,6 +1096,36 @@ export class EditModulePanel {
   }
 
   private buildInitialDataJson(): string {
+    if (this.draftData) {
+      return JSON.stringify({
+        namespace: this.draftData.namespace,
+        description: this.draftData.description,
+        references: Array.isArray(this.draftData.references) ? this.draftData.references : [],
+        roles: Array.isArray(this.draftData.roles) ? this.draftData.roles : [],
+        users: Array.isArray(this.draftData.users) ? this.draftData.users : [],
+        excludedFields: Array.isArray(this.draftData.excludedFields) ? this.draftData.excludedFields : [],
+        includes: Array.isArray(this.draftData.includes)
+          ? this.draftData.includes.map(inc => ({
+            isSaved: !!this.jsonFileUri,
+            name: inc.name,
+            path: inc.path,
+            database: inc.database,
+            scope: inc.scope,
+            allowedPushOperations: inc.allowedPushOperations,
+            maxRelativeDepth: typeof inc.maxRelativeDepth === 'number' ? inc.maxRelativeDepth : '',
+            rules: Array.isArray(inc.rules)
+              ? inc.rules.map(rule => ({
+                path: rule.path,
+                scope: rule.scope,
+                alias: rule.alias ?? '',
+                allowedPushOperations: rule.allowedPushOperations ?? '__inherited__'
+              }))
+              : []
+          }))
+          : []
+      });
+    }
+
     const includes = this.rawJson.items?.includes ?? [];
     const excludedFields = Array.isArray(this.rawJson.items?.excludedFields)
       ? this.rawJson.items.excludedFields
@@ -1061,6 +1168,53 @@ export class EditModulePanel {
           scope: rule.scope ?? '',
           alias: rule.alias ?? '',
           allowedPushOperations: rule.allowedPushOperations ?? '__inherited__'
+        }))
+      }))
+    });
+  }
+
+  private buildSavedBaselineJson(): string {
+    const includes = this.rawJson.items?.includes ?? [];
+    const excludedFields = Array.isArray(this.rawJson.items?.excludedFields)
+      ? this.rawJson.items.excludedFields
+      : includes.flatMap(inc => Array.isArray(inc.excludedFields) ? inc.excludedFields : []);
+    const references = Array.isArray(this.rawJson.references)
+      ? this.rawJson.references
+        .filter(reference => typeof reference === 'string')
+        .map(reference => reference.trim())
+        .filter(reference => reference.length > 0)
+      : [];
+    const roles = Array.isArray(this.rawJson.roles) ? this.rawJson.roles : [];
+    const users = Array.isArray(this.rawJson.users) ? this.rawJson.users : [];
+
+    return JSON.stringify({
+      namespace: this.rawJson.namespace ?? '',
+      description: this.rawJson.description ?? '',
+      references,
+      roles: roles.map(role => ({
+        domain: role.domain ?? '',
+        pattern: role.pattern ?? ''
+      })),
+      users: users.map(user => ({
+        domain: user.domain ?? '',
+        pattern: user.pattern ?? ''
+      })),
+      excludedFields: excludedFields.map(field => ({
+        fieldID: field.fieldID ?? '',
+        description: field.description ?? ''
+      })),
+      includes: includes.map(inc => ({
+        name: inc.name ?? '',
+        path: inc.path ?? '',
+        database: inc.database ?? '',
+        scope: inc.scope ?? '',
+        allowedPushOperations: inc.allowedPushOperations ?? '',
+        maxRelativeDepth: typeof inc.maxRelativeDepth === 'number' ? inc.maxRelativeDepth : undefined,
+        rules: (inc.rules ?? []).map(rule => ({
+          path: rule.path ?? '',
+          scope: rule.scope ?? '',
+          alias: rule.alias ?? undefined,
+          allowedPushOperations: rule.allowedPushOperations ?? undefined
         }))
       }))
     });
@@ -1297,6 +1451,7 @@ input::placeholder { color: var(--muted); opacity: 0.7; }
   grid-column: span 2;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 4px;
 }
 button { cursor: pointer; font: inherit; }
@@ -1614,6 +1769,7 @@ button { cursor: pointer; font: inherit; }
   grid-column: span 2;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 4px;
 }
 .helper-text {
@@ -1782,6 +1938,44 @@ button { cursor: pointer; font: inherit; }
 .include-tree-panel.tree-is-loading .include-tree-node-row {
   cursor: wait;
 }
+.confirm-modal-backdrop {
+  align-items: center;
+  background: color-mix(in srgb, var(--vscode-editor-background) 30%, transparent);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 1000;
+}
+.confirm-modal-backdrop[hidden] {
+  display: none;
+}
+.confirm-modal {
+  background: var(--vscode-editorWidget-background, var(--card-bg));
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  max-width: 420px;
+  padding: 20px;
+  width: 100%;
+}
+.confirm-modal-title {
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.confirm-modal-message {
+  color: var(--text);
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+.confirm-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
 </style>
 </head>
 <body>
@@ -1854,7 +2048,19 @@ button { cursor: pointer; font: inherit; }
   <span id="feedback" class="feedback"></span>
 </div>
 
+<div id="confirm-modal" class="confirm-modal-backdrop" hidden>
+  <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message">
+    <div id="confirm-modal-title" class="confirm-modal-title">Confirm Action</div>
+    <div id="confirm-modal-message" class="confirm-modal-message"></div>
+    <div class="confirm-modal-actions">
+      <button type="button" id="confirm-modal-cancel" class="btn-secondary">Cancel</button>
+      <button type="button" id="confirm-modal-confirm" class="btn-danger-sm">Delete</button>
+    </div>
+  </div>
+</div>
+
 <script type="application/json" id="initial-data">${this.buildInitialDataJson()}</script>
+<script type="application/json" id="initial-saved-baseline">${this.buildSavedBaselineJson()}</script>
 <script>
   const vscode = acquireVsCodeApi();
   const initialRevealSection = ${initialRevealSectionJson};
@@ -1862,6 +2068,7 @@ button { cursor: pointer; font: inherit; }
   const initialRevealRulePath = ${initialRevealRulePathJson};
   const shouldAutoFocusNamespace = ${shouldAutoFocusNamespaceJson};
   const data = JSON.parse(document.getElementById('initial-data').textContent);
+  const initialSavedBaseline = JSON.parse(document.getElementById('initial-saved-baseline').textContent);
   data.references = Array.isArray(data.references) ? data.references : [];
   data.roles = Array.isArray(data.roles) ? data.roles : [];
   data.users = Array.isArray(data.users) ? data.users : [];
@@ -1870,6 +2077,8 @@ button { cursor: pointer; font: inherit; }
   let draggedInclude = null;
   let includeTreeRequestCounter = 0;
   let savedFormState = '';
+  let draftStateSyncTimer = null;
+  let pendingConfirmAction = null;
 
   function nextIncludeTreeRequestId() {
     includeTreeRequestCounter += 1;
@@ -1887,10 +2096,73 @@ button { cursor: pointer; font: inherit; }
     }
 
     saveButton.disabled = JSON.stringify(collectData()) === savedFormState;
+    scheduleDraftStateSync();
   }
 
-  function captureSavedFormState() {
-    savedFormState = JSON.stringify(collectData());
+  function hasUnsavedChanges() {
+    return JSON.stringify(collectData()) !== savedFormState;
+  }
+
+  function postDraftState() {
+    vscode.postMessage({
+      command: 'updateDraftState',
+      data: collectData(),
+      hasUnsavedChanges: hasUnsavedChanges()
+    });
+  }
+
+  function scheduleDraftStateSync() {
+    if (draftStateSyncTimer) {
+      clearTimeout(draftStateSyncTimer);
+    }
+
+    draftStateSyncTimer = setTimeout(function() {
+      draftStateSyncTimer = null;
+      postDraftState();
+    }, 100);
+  }
+
+  function hideConfirmModal() {
+    var modal = document.getElementById('confirm-modal');
+    if (modal) {
+      modal.hidden = true;
+    }
+    pendingConfirmAction = null;
+  }
+
+  function showConfirmModal(title, message, confirmLabel, onConfirm) {
+    var modal = document.getElementById('confirm-modal');
+    var titleEl = document.getElementById('confirm-modal-title');
+    var messageEl = document.getElementById('confirm-modal-message');
+    var confirmButton = document.getElementById('confirm-modal-confirm');
+    if (!modal || !titleEl || !messageEl || !confirmButton) {
+      return;
+    }
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    confirmButton.textContent = confirmLabel;
+    pendingConfirmAction = onConfirm;
+    modal.hidden = false;
+
+    try {
+      confirmButton.focus({ preventScroll: true });
+    } catch {
+      confirmButton.focus();
+    }
+  }
+
+  function confirmDelete(itemLabel, onConfirm) {
+    showConfirmModal(
+      'Confirm Delete',
+      'Delete ' + itemLabel + '? This action cannot be undone.',
+      'Delete',
+      onConfirm
+    );
+  }
+
+  function captureSavedFormState(nextSavedState) {
+    savedFormState = JSON.stringify(nextSavedState || collectData());
     updateSaveButtonState();
   }
 
@@ -2332,7 +2604,8 @@ button { cursor: pointer; font: inherit; }
           '<input class="excluded-field-description" type="text" value="' + esc(field.description) + '" placeholder="Optional description">' +
         '</div>' +
         '<div class="excluded-field-remove-row">' +
-          '<button type="button" class="btn-danger-sm btn-remove-excluded-field">Remove Field</button>' +
+          '<button type="button" class="btn-danger-sm btn-remove-excluded-field" aria-label="Delete"><span aria-hidden="true">❌</span> Delete</button>' +
+          '<button type="button" class="btn-secondary-sm btn-add-excluded-field-inline" aria-label="Add"><span aria-hidden="true">+</span> Add</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -2492,7 +2765,8 @@ button { cursor: pointer; font: inherit; }
           '<span class="helper-text">Regex pattern used to include matching roles within the selected domain.</span>' +
         '</div>' +
         '<div class="role-remove-row">' +
-          '<button type="button" class="btn-danger-sm btn-remove-role">Remove Role Predicate</button>' +
+          '<button type="button" class="btn-danger-sm btn-remove-role" aria-label="Delete"><span aria-hidden="true">❌</span> Delete</button>' +
+          '<button type="button" class="btn-secondary-sm btn-add-role-inline" aria-label="Add"><span aria-hidden="true">+</span> Add</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -2524,7 +2798,8 @@ button { cursor: pointer; font: inherit; }
           '<span class="helper-text">Regex pattern used to include matching users within the selected domain.</span>' +
         '</div>' +
         '<div class="role-remove-row">' +
-          '<button type="button" class="btn-danger-sm btn-remove-user">Remove User Predicate</button>' +
+          '<button type="button" class="btn-danger-sm btn-remove-user" aria-label="Delete"><span aria-hidden="true">❌</span> Delete</button>' +
+          '<button type="button" class="btn-secondary-sm btn-add-user-inline" aria-label="Add"><span aria-hidden="true">+</span> Add</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -2921,7 +3196,7 @@ button { cursor: pointer; font: inherit; }
   renderExcludedFields();
   renderRoles();
   renderUsers();
-  captureSavedFormState();
+  captureSavedFormState(initialSavedBaseline);
 
   if (shouldAutoFocusNamespace) {
     setTimeout(function() {
@@ -3160,8 +3435,10 @@ button { cursor: pointer; font: inherit; }
     if (target.classList.contains('btn-remove-include')) {
       var block = target.closest('.include-block');
       if (block) {
-        block.remove();
-        updateSaveButtonState();
+        confirmDelete('include', function() {
+          block.remove();
+          updateSaveButtonState();
+        });
       }
       return;
     }
@@ -3185,7 +3462,12 @@ button { cursor: pointer; font: inherit; }
 
     if (target.classList.contains('btn-remove-rule')) {
       var rule = target.closest('.rule-block');
-      if (rule) { rule.remove(); updateSaveButtonState(); }
+      if (rule) {
+        confirmDelete('rule', function() {
+          rule.remove();
+          updateSaveButtonState();
+        });
+      }
       return;
     }
 
@@ -3203,15 +3485,42 @@ button { cursor: pointer; font: inherit; }
       return;
     }
 
+    if (target.classList.contains('btn-add-excluded-field-inline')) {
+      var sourceExcludedField = target.closest('.excluded-field-block');
+      var excludedFieldsList = document.getElementById('excluded-fields-list');
+      if (!sourceExcludedField || !excludedFieldsList) { return; }
+
+      var tmpExcludedField = document.createElement('div');
+      tmpExcludedField.innerHTML = excludedFieldHtml({ fieldID: '', description: '' });
+      var newExcludedField = tmpExcludedField.firstChild;
+      if (!newExcludedField) { return; }
+
+      excludedFieldsList.insertBefore(newExcludedField, sourceExcludedField.nextSibling);
+      var firstExcludedFieldInput = newExcludedField.querySelector ? newExcludedField.querySelector('.excluded-field-id') : null;
+      focusAndScroll(firstExcludedFieldInput);
+      updateSaveButtonState();
+      return;
+    }
+
     if (target.classList.contains('btn-remove-excluded-field')) {
       var field = target.closest('.excluded-field-block');
-      if (field) { field.remove(); updateSaveButtonState(); }
+      if (field) {
+        confirmDelete('excluded field', function() {
+          field.remove();
+          updateSaveButtonState();
+        });
+      }
       return;
     }
 
     if (target.classList.contains('btn-remove-reference')) {
       var row = target.closest('.reference-row');
-      if (row) { row.remove(); updateSaveButtonState(); }
+      if (row) {
+        confirmDelete('reference', function() {
+          row.remove();
+          updateSaveButtonState();
+        });
+      }
       return;
     }
 
@@ -3228,9 +3537,31 @@ button { cursor: pointer; font: inherit; }
       return;
     }
 
+    if (target.classList.contains('btn-add-role-inline')) {
+      var sourceRole = target.closest('.role-only-block');
+      var rolePredicatesList = document.getElementById('role-predicates-container');
+      if (!sourceRole || !rolePredicatesList) { return; }
+
+      var tmpRoleInline = document.createElement('div');
+      tmpRoleInline.innerHTML = rolePredicateHtml({ domain: '', pattern: '' });
+      var newRoleInline = tmpRoleInline.firstChild;
+      if (!newRoleInline) { return; }
+
+      rolePredicatesList.insertBefore(newRoleInline, sourceRole.nextSibling);
+      var firstInlineRoleField = newRoleInline.querySelector ? newRoleInline.querySelector('.role-domain') : null;
+      focusAndScroll(firstInlineRoleField);
+      updateSaveButtonState();
+      return;
+    }
+
     if (target.classList.contains('btn-remove-role')) {
       var role = target.closest('.role-only-block');
-      if (role) { role.remove(); updateSaveButtonState(); }
+      if (role) {
+        confirmDelete('role predicate', function() {
+          role.remove();
+          updateSaveButtonState();
+        });
+      }
       return;
     }
 
@@ -3247,12 +3578,70 @@ button { cursor: pointer; font: inherit; }
       return;
     }
 
-    if (target.classList.contains('btn-remove-user')) {
-      var user = target.closest('.user-block');
-      if (user) { user.remove(); updateSaveButtonState(); }
+    if (target.classList.contains('btn-add-user-inline')) {
+      var sourceUser = target.closest('.user-block');
+      var userPredicatesList = document.getElementById('user-predicates-container');
+      if (!sourceUser || !userPredicatesList) { return; }
+
+      var tmpUserInline = document.createElement('div');
+      tmpUserInline.innerHTML = userPredicateHtml({ domain: '', pattern: '' });
+      var newUserInline = tmpUserInline.firstChild;
+      if (!newUserInline) { return; }
+
+      userPredicatesList.insertBefore(newUserInline, sourceUser.nextSibling);
+      var firstInlineUserField = newUserInline.querySelector ? newUserInline.querySelector('.user-domain') : null;
+      focusAndScroll(firstInlineUserField);
+      updateSaveButtonState();
       return;
     }
 
+    if (target.classList.contains('btn-remove-user')) {
+      var user = target.closest('.user-block');
+      if (user) {
+        confirmDelete('user predicate', function() {
+          user.remove();
+          updateSaveButtonState();
+        });
+      }
+      return;
+    }
+
+    if (target.id === 'confirm-modal-cancel') {
+      hideConfirmModal();
+      return;
+    }
+
+    if (target.id === 'confirm-modal-confirm') {
+      var confirmAction = pendingConfirmAction;
+      hideConfirmModal();
+      if (typeof confirmAction === 'function') {
+        confirmAction();
+      }
+      return;
+    }
+
+
+  document.addEventListener('keydown', function(evt) {
+    var modal = document.getElementById('confirm-modal');
+    if (!modal || modal.hidden) {
+      return;
+    }
+
+    if (evt.key === 'Escape') {
+      evt.preventDefault();
+      hideConfirmModal();
+      return;
+    }
+
+    if (evt.key === 'Enter') {
+      var confirmAction = pendingConfirmAction;
+      evt.preventDefault();
+      hideConfirmModal();
+      if (typeof confirmAction === 'function') {
+        confirmAction();
+      }
+    }
+  });
     if (target.id === 'btn-add-reference') {
       var referencesContainer = document.getElementById('references-container');
       var tmpRef = document.createElement('div');
