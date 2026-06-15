@@ -220,6 +220,11 @@ All options can be set either as a **VS Code setting** (via `settings.json` or t
 
 ## Release Notes
 
+### 1.0.4
+
+- When attempting to close a Module Edit window with unsaved data, the system now shows a modal and permits the user to save before closing
+- Any delete button will show a confirmation modal
+
 ### 1.0.3
 
 - New modules can now be added via UI at the Modules List
